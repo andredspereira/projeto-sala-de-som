@@ -58,10 +58,6 @@ st.markdown(
         padding: 8px 16px;
         color: var(--ink);
     }
-    .stTabs [aria-selected="true"] {
-        background-color: var(--pastel-violet-soft) !important;
-        color: var(--ink) !important;
-    }
     .stButton > button, .stDownloadButton > button {
         background-color: var(--pastel-violet-soft);
         color: var(--ink);
