@@ -1,6 +1,6 @@
 """
-Projeto Sala de Som — Simulador financeiro
-Streamlit app para planeamento de uma sala de ensaios + gravação em Portugal.
+Projeto Sala de Som. Simulador financeiro.
+Streamlit app para planeamento de uma sala de ensaios e gravação de música em Portugal.
 """
 from __future__ import annotations
 
@@ -10,12 +10,74 @@ from datetime import date
 import pandas as pd
 import streamlit as st
 
-APP_PASSWORD = "projetosaladesom"
+APP_PASSWORD = "gangdaapanhadefranca"
 
 st.set_page_config(
     page_title="Projeto Sala de Som",
     page_icon="🎛️",
     layout="wide",
+)
+
+
+# ---------------------------------------------------------------------------
+# Estilo pastel
+# ---------------------------------------------------------------------------
+st.markdown(
+    """
+    <style>
+    :root {
+        --pastel-teal: #7fb8b3;
+        --pastel-teal-soft: #cfe6e3;
+        --pastel-violet: #b39ddb;
+        --pastel-violet-soft: #e5dbf3;
+        --pastel-yellow: #f6d78a;
+        --pastel-yellow-soft: #fbecc4;
+        --off-white: #faf7f0;
+        --ink: #2d2a26;
+    }
+    .stApp { background-color: var(--off-white); }
+    .block-container { padding-top: 2rem; }
+    h1, h2, h3, h4 { color: var(--ink); }
+    div[data-testid="stMetric"] {
+        background-color: var(--pastel-teal-soft);
+        border-radius: 12px;
+        padding: 12px 16px;
+        border: 1px solid rgba(127, 184, 179, 0.4);
+    }
+    div[data-testid="stMetricValue"] { color: var(--ink); }
+    section[data-testid="stSidebar"] { background-color: #f2ecdd; }
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 4px;
+        background-color: var(--pastel-yellow-soft);
+        padding: 6px;
+        border-radius: 12px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: transparent;
+        border-radius: 8px;
+        padding: 8px 16px;
+        color: var(--ink);
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: var(--pastel-violet-soft) !important;
+        color: var(--ink) !important;
+    }
+    .stButton > button, .stDownloadButton > button {
+        background-color: var(--pastel-violet-soft);
+        color: var(--ink);
+        border: 1px solid var(--pastel-violet);
+        border-radius: 10px;
+    }
+    .stButton > button:hover, .stDownloadButton > button:hover {
+        background-color: var(--pastel-violet);
+        color: var(--ink);
+    }
+    div[data-testid="stAlert"] {
+        border-radius: 12px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
 
@@ -48,17 +110,15 @@ _check_password()
 # Defaults
 # ---------------------------------------------------------------------------
 DEFAULTS = {
-    # Investimento inicial
     "renda_mensal": 450.0,
     "meses_caucao": 2.0,
     "isolamento_esponjas": 800.0,
     "eletricidade_setup": 250.0,
     "mobiliario": 400.0,
     "sinaletica_marketing_inicial": 150.0,
-    "registo_legal": 0.0,   # 0 se ficarem só na atividade aberta
+    "registo_legal": 0.0,
     "extras_iniciais": 200.0,
 
-    # Custos mensais fixos
     "renda_mensal_ongoing": 450.0,
     "agua": 25.0,
     "eletricidade": 90.0,
@@ -66,32 +126,28 @@ DEFAULTS = {
     "seguros": 20.0,
     "limpeza": 40.0,
     "reparacoes_budget": 50.0,
-    "contabilista": 0.0,    # atividade aberta simplificada pode dispensar
+    "contabilista": 0.0,
     "consumiveis": 20.0,
     "marketing_mensal": 30.0,
     "outros_mensais": 30.0,
 
-    # Receita
     "preco_ensaio_hora": 10.0,
     "horas_ensaio_mes": 50.0,
     "preco_gravacao": 250.0,
     "gravacoes_mes": 3.0,
     "horas_por_gravacao": 2.0,
 
-    # Impostos / retenção
-    "iva_aplicavel": False,   # atividade aberta abaixo de 15k€/ano pode estar isenta (art.53)
-    "taxa_irs_estimada": 0.0, # simplificado a 0 para conservador; utilizador ajusta
+    "iva_aplicavel": False,
+    "taxa_irs_estimada": 0.0,
 
-    # Simulação
     "meses_simulacao": 12,
-    "crescimento_mensal_pct": 5.0,  # % de crescimento de ocupação por mês
-    "cap_horas_ensaio": 200.0,      # tecto realista (8h/dia * ~25 dias)
+    "crescimento_mensal_pct": 5.0,
+    "cap_horas_ensaio": 200.0,
     "cap_gravacoes": 15.0,
     "mes_inicio": date.today().replace(day=1),
 
-    # Investimento externo (empréstimos de amigos)
     "invest_externo_total": 0.0,
-    "invest_externo_mes_entrada": 1,  # em que mês entra
+    "invest_externo_mes_entrada": 1,
 }
 
 
@@ -109,67 +165,69 @@ def _reset_defaults():
 
 
 # ---------------------------------------------------------------------------
-# Sidebar — parâmetros editáveis
+# Sidebar. Parâmetros editáveis
 # ---------------------------------------------------------------------------
 with st.sidebar:
-    st.header("⚙️ Parâmetros")
+    st.header("Parâmetros")
     st.caption("Todos os valores são editáveis. As mudanças propagam-se a todas as tabelas.")
 
-    if st.button("↺ Repor valores por defeito", use_container_width=True):
+    if st.button("Repor valores por defeito", use_container_width=True):
         _reset_defaults()
         st.rerun()
 
-    with st.expander("💰 Investimento inicial", expanded=False):
-        st.number_input("Renda mensal do espaço (€)", key="renda_mensal", min_value=0.0, step=25.0)
-        st.number_input("Meses de renda adiantados (caução + 1º mês)", key="meses_caucao", min_value=0.0, step=0.5)
-        st.number_input("Isolamento acústico / esponjas (€)", key="isolamento_esponjas", min_value=0.0, step=50.0)
-        st.number_input("Ligações eléctricas / adaptações (€)", key="eletricidade_setup", min_value=0.0, step=25.0)
-        st.number_input("Mobiliário básico (€)", key="mobiliario", min_value=0.0, step=25.0)
-        st.number_input("Sinalética + marketing inicial (€)", key="sinaletica_marketing_inicial", min_value=0.0, step=25.0)
-        st.number_input("Registo legal (associação/empresa) (€)", key="registo_legal", min_value=0.0, step=25.0,
+    with st.expander("Investimento inicial", expanded=False):
+        st.number_input("Renda mensal do espaço (EUR)", key="renda_mensal", min_value=0.0, step=25.0)
+        st.number_input("Meses de renda adiantados (caução mais 1 mês)", key="meses_caucao", min_value=0.0, step=0.5)
+        st.number_input("Isolamento acústico e esponjas (EUR)", key="isolamento_esponjas", min_value=0.0, step=50.0)
+        st.number_input("Ligações eléctricas e adaptações (EUR)", key="eletricidade_setup", min_value=0.0, step=25.0)
+        st.number_input("Mobiliário básico (EUR)", key="mobiliario", min_value=0.0, step=25.0)
+        st.number_input("Sinalética e marketing inicial (EUR)", key="sinaletica_marketing_inicial", min_value=0.0, step=25.0)
+        st.number_input("Registo legal (associação ou empresa) (EUR)", key="registo_legal", min_value=0.0, step=25.0,
                         help="0 se ficarem só na atividade aberta do André.")
-        st.number_input("Outros custos iniciais (€)", key="extras_iniciais", min_value=0.0, step=25.0)
+        st.number_input("Outros custos iniciais (EUR)", key="extras_iniciais", min_value=0.0, step=25.0)
 
-    with st.expander("🧾 Custos mensais fixos", expanded=False):
-        st.number_input("Renda mensal (€)", key="renda_mensal_ongoing", min_value=0.0, step=25.0)
-        st.number_input("Água (€)", key="agua", min_value=0.0, step=5.0)
-        st.number_input("Eletricidade (€)", key="eletricidade", min_value=0.0, step=5.0)
-        st.number_input("Internet (€)", key="internet", min_value=0.0, step=5.0)
-        st.number_input("Seguros (€)", key="seguros", min_value=0.0, step=5.0)
-        st.number_input("Limpeza (€)", key="limpeza", min_value=0.0, step=5.0)
-        st.number_input("Budget reparações (€)", key="reparacoes_budget", min_value=0.0, step=5.0)
-        st.number_input("Contabilista (€)", key="contabilista", min_value=0.0, step=10.0,
-                        help="Atividade aberta em regime simplificado pode dispensar; empresa/associação normalmente não.")
-        st.number_input("Consumíveis (cabos, cordas, pilhas…) (€)", key="consumiveis", min_value=0.0, step=5.0)
-        st.number_input("Marketing mensal (€)", key="marketing_mensal", min_value=0.0, step=5.0)
-        st.number_input("Outros custos mensais (€)", key="outros_mensais", min_value=0.0, step=5.0)
+    with st.expander("Custos mensais fixos", expanded=False):
+        st.number_input("Renda mensal (EUR)", key="renda_mensal_ongoing", min_value=0.0, step=25.0)
+        st.number_input("Água (EUR)", key="agua", min_value=0.0, step=5.0)
+        st.number_input("Eletricidade (EUR)", key="eletricidade", min_value=0.0, step=5.0)
+        st.number_input("Internet (EUR)", key="internet", min_value=0.0, step=5.0)
+        st.number_input("Seguros (EUR)", key="seguros", min_value=0.0, step=5.0)
+        st.number_input("Limpeza (EUR)", key="limpeza", min_value=0.0, step=5.0)
+        st.number_input("Budget reparações (EUR)", key="reparacoes_budget", min_value=0.0, step=5.0)
+        st.number_input("Contabilista (EUR)", key="contabilista", min_value=0.0, step=10.0,
+                        help="Atividade aberta em regime simplificado pode dispensar; empresa ou associação normalmente não.")
+        st.number_input("Consumíveis, cabos, cordas, pilhas (EUR)", key="consumiveis", min_value=0.0, step=5.0)
+        st.number_input("Marketing mensal (EUR)", key="marketing_mensal", min_value=0.0, step=5.0)
+        st.number_input("Outros custos mensais (EUR)", key="outros_mensais", min_value=0.0, step=5.0)
 
-    with st.expander("🎤 Receita", expanded=True):
-        st.number_input("Preço por hora de ensaio (€)", key="preco_ensaio_hora", min_value=0.0, step=1.0)
-        st.number_input("Horas de ensaio no 1º mês", key="horas_ensaio_mes", min_value=0.0, step=5.0)
-        st.number_input("Preço por gravação (€/faixa)", key="preco_gravacao", min_value=0.0, step=10.0)
-        st.number_input("Gravações no 1º mês", key="gravacoes_mes", min_value=0.0, step=1.0)
+    with st.expander("Receita", expanded=True):
+        st.number_input("Preço por hora de ensaio (EUR)", key="preco_ensaio_hora", min_value=0.0, step=1.0)
+        st.number_input("Horas de ensaio no 1.º mês", key="horas_ensaio_mes", min_value=0.0, step=5.0)
+        st.number_input("Preço por gravação (EUR por faixa)", key="preco_gravacao", min_value=0.0, step=10.0)
+        st.number_input("Gravações no 1.º mês", key="gravacoes_mes", min_value=0.0, step=1.0)
         st.number_input("Horas por gravação", key="horas_por_gravacao", min_value=0.0, step=0.5)
 
-    with st.expander("📈 Simulação", expanded=False):
+    with st.expander("Simulação", expanded=False):
         st.number_input("Meses a simular", key="meses_simulacao", min_value=1, max_value=60, step=1)
-        st.number_input("Crescimento de ocupação por mês (%)", key="crescimento_mensal_pct", min_value=-50.0, max_value=100.0, step=1.0,
+        st.number_input("Crescimento de ocupação por mês (%)", key="crescimento_mensal_pct",
+                        min_value=-50.0, max_value=100.0, step=1.0,
                         help="Aplicado a horas de ensaio e a gravações. Composto mês a mês.")
-        st.number_input("Tecto de horas de ensaio/mês", key="cap_horas_ensaio", min_value=0.0, step=10.0,
-                        help="Limite realista. 8h/dia * 25 dias ≈ 200h. As gravações ocupam o mesmo espaço.")
-        st.number_input("Tecto de gravações/mês", key="cap_gravacoes", min_value=0.0, step=1.0)
+        st.number_input("Tecto de horas de ensaio por mês", key="cap_horas_ensaio", min_value=0.0, step=10.0,
+                        help="Limite realista. 8h por dia vezes 25 dias dá cerca de 200h. As gravações ocupam o mesmo espaço.")
+        st.number_input("Tecto de gravações por mês", key="cap_gravacoes", min_value=0.0, step=1.0)
         st.date_input("Mês de arranque", key="mes_inicio")
 
-    with st.expander("🤝 Investimento externo", expanded=False):
-        st.number_input("Total emprestado por amigos (€)", key="invest_externo_total", min_value=0.0, step=100.0)
-        st.number_input("Mês em que entra o empréstimo (1 = mês inicial)", key="invest_externo_mes_entrada",
-                        min_value=1, max_value=60, step=1)
+    with st.expander("Investimento externo", expanded=False):
+        st.number_input("Total emprestado por amigos (EUR)", key="invest_externo_total", min_value=0.0, step=100.0)
+        st.number_input("Mês em que entra o empréstimo (1 igual ao mês inicial)",
+                        key="invest_externo_mes_entrada", min_value=1, max_value=60, step=1)
 
-    with st.expander("🧮 Impostos (estimativa grosseira)", expanded=False):
+    with st.expander("Impostos (estimativa grosseira)", expanded=False):
         st.checkbox("Aplicar IVA às receitas (23%)", key="iva_aplicavel",
-                    help="Atividade aberta abaixo de ~15k€/ano de faturação pode estar isenta (art. 53º CIVA). "
-                         "Ativa se ultrapassarem esse limite ou se optarem por regime normal.")
-        st.number_input("Taxa efetiva de IRS/IRC estimada (%)", key="taxa_irs_estimada", min_value=0.0, max_value=50.0, step=1.0,
+                    help="Atividade aberta abaixo de cerca de 15 mil euros por ano de faturação pode estar isenta "
+                         "(art. 53.º do CIVA). Ativa se ultrapassarem esse limite ou se optarem por regime normal.")
+        st.number_input("Taxa efetiva de IRS ou IRC estimada (%)", key="taxa_irs_estimada",
+                        min_value=0.0, max_value=50.0, step=1.0,
                         help="Deixa em 0 para uma leitura conservadora do cashflow bruto.")
 
 
@@ -179,16 +237,16 @@ with st.sidebar:
 def investimento_inicial_df() -> pd.DataFrame:
     s = st.session_state
     rows = [
-        ("Renda adiantada + caução", s.renda_mensal * s.meses_caucao),
-        ("Isolamento acústico / esponjas", s.isolamento_esponjas),
-        ("Ligações eléctricas / adaptações", s.eletricidade_setup),
+        ("Renda adiantada e caução", s.renda_mensal * s.meses_caucao),
+        ("Isolamento acústico e esponjas", s.isolamento_esponjas),
+        ("Ligações eléctricas e adaptações", s.eletricidade_setup),
         ("Mobiliário básico", s.mobiliario),
-        ("Sinalética + marketing inicial", s.sinaletica_marketing_inicial),
+        ("Sinalética e marketing inicial", s.sinaletica_marketing_inicial),
         ("Registo legal", s.registo_legal),
         ("Outros custos iniciais", s.extras_iniciais),
     ]
-    df = pd.DataFrame(rows, columns=["Rubrica", "Valor (€)"])
-    df.loc[len(df)] = ["TOTAL", df["Valor (€)"].sum()]
+    df = pd.DataFrame(rows, columns=["Rubrica", "Valor (EUR)"])
+    df.loc[len(df)] = ["TOTAL", df["Valor (EUR)"].sum()]
     return df
 
 
@@ -207,8 +265,8 @@ def custos_mensais_df() -> pd.DataFrame:
         ("Marketing", s.marketing_mensal),
         ("Outros", s.outros_mensais),
     ]
-    df = pd.DataFrame(rows, columns=["Rubrica", "Valor (€)"])
-    df.loc[len(df)] = ["TOTAL / mês", df["Valor (€)"].sum()]
+    df = pd.DataFrame(rows, columns=["Rubrica", "Valor (EUR)"])
+    df.loc[len(df)] = ["TOTAL por mês", df["Valor (EUR)"].sum()]
     return df
 
 
@@ -219,11 +277,11 @@ def receita_base_mes() -> dict:
     horas_ocupadas = s.horas_ensaio_mes + s.gravacoes_mes * s.horas_por_gravacao
     return {
         "Horas de ensaio": s.horas_ensaio_mes,
-        "Receita ensaios (€)": receita_ensaios,
+        "Receita ensaios (EUR)": receita_ensaios,
         "Gravações": s.gravacoes_mes,
-        "Receita gravações (€)": receita_gravacoes,
+        "Receita gravações (EUR)": receita_gravacoes,
         "Horas totais de ocupação": horas_ocupadas,
-        "Receita bruta / mês (€)": receita_ensaios + receita_gravacoes,
+        "Receita bruta por mês (EUR)": receita_ensaios + receita_gravacoes,
     }
 
 
@@ -231,15 +289,15 @@ def simular_meses() -> pd.DataFrame:
     s = st.session_state
     n = int(s.meses_simulacao)
     crescimento = 1 + s.crescimento_mensal_pct / 100.0
-    custo_fixo = custos_mensais_df().iloc[-1]["Valor (€)"]
+    custo_fixo = custos_mensais_df().iloc[-1]["Valor (EUR)"]
 
     horas_ensaio = s.horas_ensaio_mes
     gravacoes = s.gravacoes_mes
 
-    invest_inicial_total = investimento_inicial_df().iloc[-1]["Valor (€)"]
+    invest_inicial_total = investimento_inicial_df().iloc[-1]["Valor (EUR)"]
 
     linhas = []
-    caixa_acumulada = -invest_inicial_total  # arranca no vermelho pelo investimento
+    caixa_acumulada = -invest_inicial_total
     mes0 = s.mes_inicio
 
     for i in range(n):
@@ -260,7 +318,6 @@ def simular_meses() -> pd.DataFrame:
         invest_externo_mes = s.invest_externo_total if (i + 1) == int(s.invest_externo_mes_entrada) else 0.0
         caixa_acumulada += margem_liq + invest_externo_mes
 
-        # Data do mês
         year = mes0.year + (mes0.month - 1 + i) // 12
         month = (mes0.month - 1 + i) % 12 + 1
         mes_label = f"{year}-{month:02d}"
@@ -269,16 +326,16 @@ def simular_meses() -> pd.DataFrame:
             "Mês": mes_label,
             "Horas ensaio": round(m_horas, 1),
             "Gravações": round(m_grav, 2),
-            "Receita ensaios (€)": round(receita_ensaios, 2),
-            "Receita gravações (€)": round(receita_gravacoes, 2),
-            "Receita bruta (€)": round(receita_bruta, 2),
-            "IVA a entregar (€)": round(iva, 2),
-            "Custos fixos (€)": round(custo_fixo, 2),
-            "Margem pré-imposto (€)": round(margem_pre_imposto, 2),
-            "IRS/IRC estimado (€)": round(irs, 2),
-            "Margem líquida (€)": round(margem_liq, 2),
-            "Investimento externo (€)": round(invest_externo_mes, 2),
-            "Caixa acumulada (€)": round(caixa_acumulada, 2),
+            "Receita ensaios (EUR)": round(receita_ensaios, 2),
+            "Receita gravações (EUR)": round(receita_gravacoes, 2),
+            "Receita bruta (EUR)": round(receita_bruta, 2),
+            "IVA a entregar (EUR)": round(iva, 2),
+            "Custos fixos (EUR)": round(custo_fixo, 2),
+            "Margem pré-imposto (EUR)": round(margem_pre_imposto, 2),
+            "IRS ou IRC estimado (EUR)": round(irs, 2),
+            "Margem líquida (EUR)": round(margem_liq, 2),
+            "Investimento externo (EUR)": round(invest_externo_mes, 2),
+            "Caixa acumulada (EUR)": round(caixa_acumulada, 2),
         })
 
         horas_ensaio *= crescimento
@@ -298,15 +355,14 @@ def build_excel() -> bytes:
 
         rec = receita_base_mes()
         pd.DataFrame(list(rec.items()), columns=["Métrica", "Valor"]).to_excel(
-            writer, sheet_name="Receita mês base", index=False
+            writer, sheet_name="Receita mes base", index=False
         )
 
-        simular_meses().to_excel(writer, sheet_name="Simulação mensal", index=False)
+        simular_meses().to_excel(writer, sheet_name="Simulacao mensal", index=False)
 
-        # Sheet de parâmetros para transparência
         params = {k: st.session_state.get(k) for k in DEFAULTS.keys()}
         pd.DataFrame(list(params.items()), columns=["Parâmetro", "Valor"]).to_excel(
-            writer, sheet_name="Parâmetros", index=False
+            writer, sheet_name="Parametros", index=False
         )
     return buf.getvalue()
 
@@ -314,120 +370,57 @@ def build_excel() -> bytes:
 # ---------------------------------------------------------------------------
 # UI principal
 # ---------------------------------------------------------------------------
-st.title("🎛️ Projeto Sala de Som — Simulador")
+st.title("🎛️ Projeto Sala de Som")
 st.caption("Simulação financeira editável para apresentação. Todas as células da barra lateral são customizáveis.")
 
 tabs = st.tabs([
-    "📌 Estrutura legal",
-    "💰 Investimento inicial",
-    "🧾 Custos mensais",
-    "🎤 Receita",
-    "📈 Simulação mensal",
-    "⬇️ Download",
+    "Investimento inicial",
+    "Custos mensais",
+    "Receita",
+    "Simulação mensal",
+    "Download",
 ])
 
-# --- Tab 1: Estrutura legal ---
+# --- Investimento inicial ---
 with tabs[0]:
-    st.subheader("Que forma legal usar?")
-    st.markdown(
-        """
-**Recomendação prática para arrancar**: **usarem a atividade aberta que o André já tem** como pessoa singular.
-É a via mais barata (0 € de setup), a mais rápida, e não obriga ninguém a receber salário.
-Depois, se o projeto crescer ou se a Câmara / IEFP começar a exigir enquadramento próprio, migram para associação ou empresa.
-
----
-
-### Opção A — Atividade aberta (pessoa singular, o que o André já tem)
-- **Custos de setup**: 0 €.
-- **Contabilidade**: regime simplificado até 200 000 € de faturação/ano — dispensa contabilista certificado.
-- **IVA**: se a faturação anual ficar abaixo de ~15 000 € podem estar isentos pelo art. 53º do CIVA. Acima disso passam a cobrar 23%.
-- **Segurança social**: contribuições trimestrais como trabalhador independente (calculadas sobre 70% do rendimento; primeiros 12 meses isentos se for a 1ª abertura, no vosso caso já não).
-- **IRS**: rendimentos entram na categoria B do André; 75% do rendimento é considerado tributável no simplificado.
-- **Como acomodar sócios/gerentes sem salário**: eles simplesmente colaboram sem vínculo. Ninguém precisa de estar declarado. Se receberem algo pontual, faz-se um recibo verde individual.
-- **Grande limitação**: **responsabilidade ilimitada** (o património pessoal do André responde por dívidas do negócio) e **toda a faturação é do André** — o que também significa que toda a carga fiscal cai sobre ele.
-
-### Opção B — Associação Cultural sem fins lucrativos
-- **Custos de setup**: ~150–250 € (Ato Constitutivo Online no Espaço Empresa ou notário) + publicação obrigatória. Precisam de **mínimo 3 sócios fundadores**.
-- **Sem salários obrigatórios**: os órgãos sociais (direção, mesa da assembleia, conselho fiscal) **são obrigatoriamente não remunerados por defeito** — encaixa exatamente no vosso caso.
-- **Fiscalidade**: podem estar isentos de IRC nas atividades culturais sem fins lucrativos; obrigadas a IES anual mesmo assim.
-- **Vantagens**: acesso a **candidaturas culturais** (DGArtes, Câmara Municipal, Fundação Calouste Gulbenkian, GDA), imagem pública alinhada com o projeto (sala de ensaios comunitária), e o património separa-se das pessoas.
-- **Desvantagens**: **não podem distribuir lucros** — tudo o que sobrar tem de ser reinvestido no objeto social. Se o objetivo final for tirarem dinheiro para vocês, não serve.
-- **Burocracia**: assembleias gerais anuais, atas, IES, contabilidade organizada normalmente exigida se ultrapassarem certos limiares.
-
-### Opção C — Sociedade por Quotas (Lda.) via *Empresa na Hora*
-- **Custos de setup**: ~360 € + capital social (mínimo legal 1 €, na prática 1 000–5 000 €).
-- **Contabilista certificado obrigatório**: ~100–200 €/mês. Isto sozinho já mata a viabilidade nos primeiros meses do vosso plano.
-- **Gerência sem remuneração**: **é possível** — o gerente pode estar dispensado de descontos para a Segurança Social se declarar que não é remunerado *e* tiver enquadramento noutra atividade (ex.: a atividade aberta do André). Sem esse enquadramento, há risco de a SS presumir remuneração e cobrar contribuições sobre o IAS.
-- **Vantagem principal**: responsabilidade limitada ao capital social.
-- **Recomendação**: **evitar para já**. Só faz sentido quando a faturação justificar os ~1 500–2 500 €/ano só em contabilidade + fiscalidade.
-
----
-
-### Comparação rápida
-"""
-    )
-    comp = pd.DataFrame(
-        [
-            ["Setup (€)", "0", "~200", "~360 + capital"],
-            ["Contabilista obrigatório", "Não (simplificado)", "Depende (geralmente sim)", "Sim"],
-            ["Sócios/gerentes podem não ter salário", "Sim (só o titular)", "Sim (por regra)", "Sim, mas com riscos SS"],
-            ["Podem distribuir lucros", "Sim (é rendimento do titular)", "Não", "Sim (após IRC)"],
-            ["Responsabilidade pessoal", "Ilimitada", "Limitada à associação", "Limitada ao capital"],
-            ["Acesso a apoios culturais", "Muito limitado", "Alto", "Baixo"],
-            ["Melhor para arrancar já", "✅", "⚠️ 2ª fase", "❌ prematuro"],
-        ],
-        columns=["Critério", "Atividade aberta", "Associação Cultural", "Lda."],
-    )
-    st.dataframe(comp, use_container_width=True, hide_index=True)
-
-    st.info(
-        "**Sugestão de caminho**: arrancam em nome do André (0 € de setup, 0 € de contabilista). "
-        "Passados 6–12 meses, se a ocupação se consolidar e quiserem candidatar-se a apoios culturais, "
-        "abrem uma Associação Cultural em paralelo e passam parte da operação para lá. "
-        "A Lda. só se justifica se a faturação anual passar largamente os 30 000 €.",
-        icon="💡",
-    )
-
-# --- Tab 2: Investimento inicial ---
-with tabs[1]:
     st.subheader("Investimento inicial")
     df = investimento_inicial_df()
     st.dataframe(df, use_container_width=True, hide_index=True)
-    total = df.iloc[-1]["Valor (€)"]
-    st.metric("Total de investimento inicial", f"€ {total:,.2f}")
-    st.caption("Edita qualquer valor na barra lateral → **Investimento inicial**.")
+    total = df.iloc[-1]["Valor (EUR)"]
+    st.metric("Total de investimento inicial", f"EUR {total:,.2f}")
+    st.caption("Edita qualquer valor na barra lateral em Investimento inicial.")
 
-# --- Tab 3: Custos mensais ---
-with tabs[2]:
+# --- Custos mensais ---
+with tabs[1]:
     st.subheader("Custos mensais fixos")
     df = custos_mensais_df()
     st.dataframe(df, use_container_width=True, hide_index=True)
-    total = df.iloc[-1]["Valor (€)"]
-    st.metric("Total de custos mensais", f"€ {total:,.2f}")
+    total = df.iloc[-1]["Valor (EUR)"]
+    st.metric("Total de custos mensais", f"EUR {total:,.2f}")
 
-# --- Tab 4: Receita ---
-with tabs[3]:
-    st.subheader("Receita — mês base (o 1º mês da simulação)")
+# --- Receita ---
+with tabs[2]:
+    st.subheader("Receita no mês base (o 1.º mês da simulação)")
     rec = receita_base_mes()
     df = pd.DataFrame(list(rec.items()), columns=["Métrica", "Valor"])
     st.dataframe(df, use_container_width=True, hide_index=True)
 
-    custo_fix = custos_mensais_df().iloc[-1]["Valor (€)"]
-    receita_bruta = rec["Receita bruta / mês (€)"]
+    custo_fix = custos_mensais_df().iloc[-1]["Valor (EUR)"]
+    receita_bruta = rec["Receita bruta por mês (EUR)"]
     col1, col2, col3 = st.columns(3)
-    col1.metric("Receita bruta / mês", f"€ {receita_bruta:,.2f}")
-    col2.metric("Custos fixos / mês", f"€ {custo_fix:,.2f}")
-    col3.metric("Margem bruta / mês", f"€ {receita_bruta - custo_fix:,.2f}",
-                delta=f"{(receita_bruta - custo_fix):.0f} €")
+    col1.metric("Receita bruta por mês", f"EUR {receita_bruta:,.2f}")
+    col2.metric("Custos fixos por mês", f"EUR {custo_fix:,.2f}")
+    col3.metric("Margem bruta por mês", f"EUR {receita_bruta - custo_fix:,.2f}",
+                delta=f"{(receita_bruta - custo_fix):.0f} EUR")
 
-    horas_ocupacao_max = 8 * 25  # 8h/dia, 25 dias/mês
+    horas_ocupacao_max = 8 * 25
     st.caption(
-        f"Ocupação atual: **{rec['Horas totais de ocupação']:.1f} h/mês** "
-        f"contra ~{horas_ocupacao_max} h/mês teóricas (8h/dia × 25 dias)."
+        f"Ocupação atual: {rec['Horas totais de ocupação']:.1f} h por mês "
+        f"contra cerca de {horas_ocupacao_max} h por mês teóricas (8h por dia vezes 25 dias)."
     )
 
-# --- Tab 5: Simulação mensal ---
-with tabs[4]:
+# --- Simulação mensal ---
+with tabs[3]:
     st.subheader("Simulação mês a mês")
     st.caption(
         "A ocupação cresce à taxa que definires na barra lateral, com tetos realistas. "
@@ -437,25 +430,23 @@ with tabs[4]:
     st.dataframe(sim, use_container_width=True, hide_index=True)
 
     st.markdown("#### Caixa acumulada")
-    st.line_chart(sim.set_index("Mês")[["Caixa acumulada (€)"]])
+    st.line_chart(sim.set_index("Mês")[["Caixa acumulada (EUR)"]])
 
     st.markdown("#### Receita vs custos")
-    st.bar_chart(sim.set_index("Mês")[["Receita bruta (€)", "Custos fixos (€)"]])
+    st.bar_chart(sim.set_index("Mês")[["Receita bruta (EUR)", "Custos fixos (EUR)"]])
 
-    # Breakeven
-    breakeven_row = sim[sim["Caixa acumulada (€)"] >= 0].head(1)
+    breakeven_row = sim[sim["Caixa acumulada (EUR)"] >= 0].head(1)
     if breakeven_row.empty:
         st.warning(
             "Nos meses simulados a caixa acumulada nunca chega a positivo. "
-            "Ajusta preço, ocupação, crescimento, ou entra investimento externo.",
-            icon="⚠️",
+            "Ajusta preço, ocupação, crescimento, ou entra investimento externo."
         )
     else:
         mes_be = breakeven_row.iloc[0]["Mês"]
-        st.success(f"Ponto de equilíbrio de caixa atingido em **{mes_be}**.", icon="✅")
+        st.success(f"Ponto de equilíbrio de caixa atingido em {mes_be}.")
 
-# --- Tab 6: Download ---
-with tabs[5]:
+# --- Download ---
+with tabs[4]:
     st.subheader("Download da spreadsheet")
     st.caption(
         "Descarrega uma versão Excel com todas as tabelas e os parâmetros atuais. "
@@ -464,15 +455,14 @@ with tabs[5]:
     data = build_excel()
     fname = f"projeto_sala_de_som_{date.today().isoformat()}.xlsx"
     st.download_button(
-        label="⬇️ Descarregar Excel",
+        label="Descarregar Excel",
         data=data,
         file_name=fname,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
     )
 
-    st.markdown("---")
     st.caption(
         "Nota: os valores só existem enquanto a sessão do browser estiver aberta. "
-        "Para guardares uma 'versão', faz download do Excel — cada download é uma versão datada."
+        "Para guardares uma versão, faz download do Excel. Cada download é uma versão datada."
     )
