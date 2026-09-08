@@ -133,6 +133,12 @@ DEFAULTS = {
     "gravacoes_mes": 3.0,
     "horas_por_gravacao": 2.0,
 
+    "preco_ensaio_hora_s2": 12.0,
+    "horas_ensaio_mes_s2": 30.0,
+    "preco_gravacao_s2": 300.0,
+    "gravacoes_mes_s2": 2.0,
+    "horas_por_gravacao_s2": 2.0,
+
     "iva_aplicavel": False,
     "taxa_irs_estimada": 0.0,
 
@@ -196,21 +202,30 @@ with st.sidebar:
         st.number_input("Marketing mensal (EUR)", key="marketing_mensal", min_value=0.0, step=5.0)
         st.number_input("Outros custos mensais (EUR)", key="outros_mensais", min_value=0.0, step=5.0)
 
-    with st.expander("Receita", expanded=True):
+    with st.expander("Receita. Sala 1", expanded=True):
         st.number_input("Preço por hora de ensaio (EUR)", key="preco_ensaio_hora", min_value=0.0, step=1.0)
         st.number_input("Horas de ensaio no 1.º mês", key="horas_ensaio_mes", min_value=0.0, step=5.0)
         st.number_input("Preço por gravação (EUR por faixa)", key="preco_gravacao", min_value=0.0, step=10.0)
         st.number_input("Gravações no 1.º mês", key="gravacoes_mes", min_value=0.0, step=1.0)
         st.number_input("Horas por gravação", key="horas_por_gravacao", min_value=0.0, step=0.5)
 
+    with st.expander("Receita. Sala 2", expanded=True):
+        st.caption("Sala mais equipada, com preço base ligeiramente superior.")
+        st.number_input("Preço por hora de ensaio (EUR)", key="preco_ensaio_hora_s2", min_value=0.0, step=1.0)
+        st.number_input("Horas de ensaio no 1.º mês", key="horas_ensaio_mes_s2", min_value=0.0, step=5.0)
+        st.number_input("Preço por gravação (EUR por faixa)", key="preco_gravacao_s2", min_value=0.0, step=10.0)
+        st.number_input("Gravações no 1.º mês", key="gravacoes_mes_s2", min_value=0.0, step=1.0)
+        st.number_input("Horas por gravação", key="horas_por_gravacao_s2", min_value=0.0, step=0.5)
+
     with st.expander("Simulação", expanded=False):
         st.number_input("Meses a simular", key="meses_simulacao", min_value=1, max_value=60, step=1)
         st.number_input("Crescimento de ocupação por mês (%)", key="crescimento_mensal_pct",
                         min_value=-50.0, max_value=100.0, step=1.0,
                         help="Aplicado a horas de ensaio e a gravações. Composto mês a mês.")
-        st.number_input("Tecto de horas de ensaio por mês", key="cap_horas_ensaio", min_value=0.0, step=10.0,
-                        help="Limite realista. 8h por dia vezes 25 dias dá cerca de 200h. As gravações ocupam o mesmo espaço.")
-        st.number_input("Tecto de gravações por mês", key="cap_gravacoes", min_value=0.0, step=1.0)
+        st.number_input("Tecto de horas de ensaio por mês, por sala", key="cap_horas_ensaio", min_value=0.0, step=10.0,
+                        help="Limite realista para cada sala. 8h por dia vezes 25 dias dá cerca de 200h. "
+                             "As gravações ocupam o mesmo espaço da respectiva sala.")
+        st.number_input("Tecto de gravações por mês, por sala", key="cap_gravacoes", min_value=0.0, step=1.0)
         st.date_input("Mês de arranque", key="mes_inicio")
 
     with st.expander("Investimento externo", expanded=False):
@@ -268,16 +283,26 @@ def custos_mensais_df() -> pd.DataFrame:
 
 def receita_base_mes() -> dict:
     s = st.session_state
-    receita_ensaios = s.preco_ensaio_hora * s.horas_ensaio_mes
-    receita_gravacoes = s.preco_gravacao * s.gravacoes_mes
-    horas_ocupadas = s.horas_ensaio_mes + s.gravacoes_mes * s.horas_por_gravacao
+    # Sala 1
+    ens1 = s.preco_ensaio_hora * s.horas_ensaio_mes
+    grv1 = s.preco_gravacao * s.gravacoes_mes
+    hocup1 = s.horas_ensaio_mes + s.gravacoes_mes * s.horas_por_gravacao
+    # Sala 2
+    ens2 = s.preco_ensaio_hora_s2 * s.horas_ensaio_mes_s2
+    grv2 = s.preco_gravacao_s2 * s.gravacoes_mes_s2
+    hocup2 = s.horas_ensaio_mes_s2 + s.gravacoes_mes_s2 * s.horas_por_gravacao_s2
     return {
-        "Horas de ensaio": s.horas_ensaio_mes,
-        "Receita ensaios (EUR)": receita_ensaios,
-        "Gravações": s.gravacoes_mes,
-        "Receita gravações (EUR)": receita_gravacoes,
-        "Horas totais de ocupação": horas_ocupadas,
-        "Receita bruta por mês (EUR)": receita_ensaios + receita_gravacoes,
+        "Horas de ensaio Sala 1": s.horas_ensaio_mes,
+        "Receita ensaios Sala 1 (EUR)": ens1,
+        "Gravações Sala 1": s.gravacoes_mes,
+        "Receita gravações Sala 1 (EUR)": grv1,
+        "Horas de ocupação Sala 1": hocup1,
+        "Horas de ensaio Sala 2": s.horas_ensaio_mes_s2,
+        "Receita ensaios Sala 2 (EUR)": ens2,
+        "Gravações Sala 2": s.gravacoes_mes_s2,
+        "Receita gravações Sala 2 (EUR)": grv2,
+        "Horas de ocupação Sala 2": hocup2,
+        "Receita bruta por mês (EUR)": ens1 + grv1 + ens2 + grv2,
     }
 
 
@@ -287,8 +312,10 @@ def simular_meses() -> pd.DataFrame:
     crescimento = 1 + s.crescimento_mensal_pct / 100.0
     custo_fixo = custos_mensais_df().iloc[-1]["Valor (EUR)"]
 
-    horas_ensaio = s.horas_ensaio_mes
-    gravacoes = s.gravacoes_mes
+    horas_ensaio_s1 = s.horas_ensaio_mes
+    gravacoes_s1 = s.gravacoes_mes
+    horas_ensaio_s2 = s.horas_ensaio_mes_s2
+    gravacoes_s2 = s.gravacoes_mes_s2
 
     invest_inicial_total = investimento_inicial_df().iloc[-1]["Valor (EUR)"]
 
@@ -297,12 +324,19 @@ def simular_meses() -> pd.DataFrame:
     mes0 = s.mes_inicio
 
     for i in range(n):
-        m_horas = min(horas_ensaio, s.cap_horas_ensaio)
-        m_grav = min(gravacoes, s.cap_gravacoes)
+        m_horas_s1 = min(horas_ensaio_s1, s.cap_horas_ensaio)
+        m_grav_s1 = min(gravacoes_s1, s.cap_gravacoes)
+        m_horas_s2 = min(horas_ensaio_s2, s.cap_horas_ensaio)
+        m_grav_s2 = min(gravacoes_s2, s.cap_gravacoes)
 
-        receita_ensaios = m_horas * s.preco_ensaio_hora
-        receita_gravacoes = m_grav * s.preco_gravacao
-        receita_bruta = receita_ensaios + receita_gravacoes
+        rec_ens_s1 = m_horas_s1 * s.preco_ensaio_hora
+        rec_grv_s1 = m_grav_s1 * s.preco_gravacao
+        rec_ens_s2 = m_horas_s2 * s.preco_ensaio_hora_s2
+        rec_grv_s2 = m_grav_s2 * s.preco_gravacao_s2
+
+        receita_s1 = rec_ens_s1 + rec_grv_s1
+        receita_s2 = rec_ens_s2 + rec_grv_s2
+        receita_bruta = receita_s1 + receita_s2
 
         iva = receita_bruta * 0.23 / 1.23 if s.iva_aplicavel else 0.0
         receita_liq_iva = receita_bruta - iva
@@ -320,10 +354,12 @@ def simular_meses() -> pd.DataFrame:
 
         linhas.append({
             "Mês": mes_label,
-            "Horas ensaio": round(m_horas, 1),
-            "Gravações": round(m_grav, 2),
-            "Receita ensaios (EUR)": round(receita_ensaios, 2),
-            "Receita gravações (EUR)": round(receita_gravacoes, 2),
+            "Horas Sala 1": round(m_horas_s1, 1),
+            "Gravações Sala 1": round(m_grav_s1, 2),
+            "Receita Sala 1 (EUR)": round(receita_s1, 2),
+            "Horas Sala 2": round(m_horas_s2, 1),
+            "Gravações Sala 2": round(m_grav_s2, 2),
+            "Receita Sala 2 (EUR)": round(receita_s2, 2),
             "Receita bruta (EUR)": round(receita_bruta, 2),
             "IVA a entregar (EUR)": round(iva, 2),
             "Custos fixos (EUR)": round(custo_fixo, 2),
@@ -334,8 +370,10 @@ def simular_meses() -> pd.DataFrame:
             "Caixa acumulada (EUR)": round(caixa_acumulada, 2),
         })
 
-        horas_ensaio *= crescimento
-        gravacoes *= crescimento
+        horas_ensaio_s1 *= crescimento
+        gravacoes_s1 *= crescimento
+        horas_ensaio_s2 *= crescimento
+        gravacoes_s2 *= crescimento
 
     return pd.DataFrame(linhas)
 
@@ -410,9 +448,12 @@ with tabs[2]:
                 delta=f"{(receita_bruta - custo_fix):.0f} EUR")
 
     horas_ocupacao_max = 8 * 25
+    total_ocup = rec["Horas de ocupação Sala 1"] + rec["Horas de ocupação Sala 2"]
     st.caption(
-        f"Ocupação atual: {rec['Horas totais de ocupação']:.1f} h por mês "
-        f"contra cerca de {horas_ocupacao_max} h por mês teóricas (8h por dia vezes 25 dias)."
+        f"Ocupação atual: Sala 1 com {rec['Horas de ocupação Sala 1']:.1f} h, "
+        f"Sala 2 com {rec['Horas de ocupação Sala 2']:.1f} h (total {total_ocup:.1f} h). "
+        f"Capacidade teórica por sala: cerca de {horas_ocupacao_max} h por mês "
+        f"(8h por dia vezes 25 dias)."
     )
 
 # --- Simulação mensal ---
