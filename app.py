@@ -123,7 +123,7 @@ DEFAULTS = {
     "armazenamento_online": 30.0,
     "marketing_mensal": 5.0,
 
-    # Ressarcimento aos pais do Pedro (definido na tab final)
+    # Contribuição mensal para ressarcimento do imóvel (definido na tab final)
     "contribuicao_mensal": 1000.0,
 
     # Receita Sala 1 - Ensaios
@@ -205,8 +205,8 @@ with st.sidebar:
 
     with st.expander("Custos mensais fixos", expanded=False):
         st.caption(
-            "Custos mensais fixos, sem o ressarcimento aos pais do Pedro. "
-            "Esse ressarcimento é decidido na tab Sustentabilidade e é adicionado aos custos aí."
+            "Custos mensais fixos, sem a contribuição para ressarcimento do imóvel. "
+            "Essa contribuição é decidida na tab Sustentabilidade e é adicionada aos custos aí."
         )
         st.number_input("Custos mensais relacionados com o espaço (EUR)",
                         key="custos_espaco_extra", min_value=0.0, step=5.0,
@@ -330,7 +330,7 @@ def custos_mensais_total() -> float:
 
 
 def custo_ressarcir_imovel() -> float:
-    """Custo que os pais do Pedro cobrem e que tem de ser ressarcido: imóvel + selo + obras."""
+    """Custo do imóvel a ressarcir: imóvel + selo + obras."""
     s = st.session_state
     return s.preco_imovel + s.preco_imovel * s.pct_imposto_selo / 100.0 + s.obras_iniciais
 
@@ -424,7 +424,7 @@ def receita_base_mes() -> dict:
 # Simulação mensal
 # ---------------------------------------------------------------------------
 def simular(contribuicao: float) -> pd.DataFrame:
-    """Simula mês a mês. A `contribuicao` é paga aos pais até o imóvel estar ressarcido."""
+    """Simula mês a mês. A `contribuicao` é paga até o imóvel estar totalmente ressarcido."""
     s = st.session_state
     n = int(s.meses_simulacao)
     g = 1.0 + s.crescimento_mensal_pct / 100.0
@@ -458,7 +458,7 @@ def simular(contribuicao: float) -> pd.DataFrame:
         r_s2g = hgrav_c * s.s2_preco_hora_gravacao + faixas_c * s.s2_preco_faixa_mistura
         receita = r_s1 + r_s2e + r_s2g
 
-        # Contribuição paga aos pais este mês (só até estar tudo ressarcido)
+        # Contribuição este mês (só até o imóvel estar totalmente ressarcido)
         restante = max(a_ressarcir - pago_acumulado, 0.0)
         contrib_mes = min(contribuicao, restante)
         pago_acumulado += contrib_mes
@@ -474,11 +474,11 @@ def simular(contribuicao: float) -> pd.DataFrame:
             "Receita Sala 2 Gravação (EUR)": round(r_s2g, 2),
             "Receita total (EUR)": round(receita, 2),
             "Custos fixos (EUR)": round(custo_fixo_base, 2),
-            "Contribuição aos pais (EUR)": round(contrib_mes, 2),
+            "Contribuição de ressarcimento (EUR)": round(contrib_mes, 2),
             "Margem mensal (EUR)": round(margem, 2),
             "Caixa da empresa (EUR)": round(caixa_empresa, 2),
-            "Total pago aos pais (EUR)": round(pago_acumulado, 2),
-            "Falta pagar aos pais (EUR)": round(max(a_ressarcir - pago_acumulado, 0.0), 2),
+            "Total ressarcido (EUR)": round(pago_acumulado, 2),
+            "Falta ressarcir (EUR)": round(max(a_ressarcir - pago_acumulado, 0.0), 2),
         })
 
         # Crescimento composto
@@ -575,11 +575,11 @@ with tabs[0]:
 
     ressarcir = custo_ressarcir_imovel()
     st.info(
-        f"**Cobertura**: os pais do Pedro cobrem o imóvel + imposto de selo + obras, "
-        f"num total de **EUR {ressarcir:,.2f}**, e este valor é ressarcido pela empresa através "
+        f"**Custo a ressarcir**: o imóvel + imposto de selo + obras somam "
+        f"**EUR {ressarcir:,.2f}**, e este valor é ressarcido pela empresa através "
         f"da contribuição mensal definida na tab Sustentabilidade. "
-        f"O mobiliário e material (**EUR {st.session_state.mobiliario_material:,.2f}**) fica a cargo "
-        f"dos fundadores no arranque."
+        f"O mobiliário e material (**EUR {st.session_state.mobiliario_material:,.2f}**) "
+        f"fica a cargo dos fundadores no arranque."
     )
     st.caption("Compra do imóvel a pronto, sem empréstimo bancário. Todos os valores são editáveis na barra lateral.")
 
@@ -641,26 +641,43 @@ with tabs[3]:
 with tabs[4]:
     st.subheader("Sustentabilidade do projeto")
 
+    def _smart_round(v: float) -> float:
+        """Arredonda a 3 algarismos significativos para leitura fácil."""
+        if v is None:
+            return v
+        av = abs(v)
+        if av < 1000:
+            step = 1
+        elif av < 10000:
+            step = 100
+        elif av < 100000:
+            step = 1000
+        elif av < 1000000:
+            step = 10000
+        else:
+            step = 100000
+        return round(v / step) * step
+
     def _euro_fmt(v: float) -> str:
-        return f"€ {v:,.0f}".replace(",", " ")
+        return f"€ {_smart_round(v):,.0f}".replace(",", " ")
 
     a_ressarcir = custo_ressarcir_imovel()
     custos_fixos_mes = custos_mensais_total()
 
     st.markdown(
-        f"Os pais do Pedro cobrem o **preço do imóvel + imposto de selo + obras**, "
-        f"que somam **{_euro_fmt(a_ressarcir)}**. Este valor é ressarcido através de uma "
+        f"O **preço do imóvel + imposto de selo + obras** somam "
+        f"**{_euro_fmt(a_ressarcir)}**. Este valor é totalmente ressarcido através de uma "
         f"contribuição mensal fixa da empresa. Ajusta abaixo para ver o impacto no prazo "
         f"e no lucro."
     )
 
     st.number_input(
-        "Contribuição mensal para ressarcimento do espaço (EUR)",
+        "Contribuição mensal para ressarcimento do imóvel (EUR)",
         key="contribuicao_mensal",
         min_value=0.0,
         step=50.0,
-        help="Adiciona-se aos custos mensais e é pago aos pais do Pedro todos os meses "
-             "até o valor total do imóvel estar ressarcido.",
+        help="Adiciona-se aos custos mensais e é pago todos os meses até o imóvel estar "
+             "totalmente ressarcido.",
     )
     contribuicao = float(st.session_state["contribuicao_mensal"])
 
@@ -672,7 +689,7 @@ with tabs[4]:
     if pay is not None:
         pay_str = f"{pay/12:,.1f} anos"
         pay_sub = f"{pay} meses"
-        # Caixa da empresa no mês em que os pais estão pagos
+        # Caixa da empresa no mês em que o imóvel está totalmente ressarcido
         if pay <= len(sim):
             caixa_no_ressarcimento = float(sim.iloc[pay - 1]["Caixa da empresa (EUR)"])
         else:
@@ -688,12 +705,12 @@ with tabs[4]:
         f"""
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:1rem;">
           <div style="background:#cfe6e3; padding:14px 16px; border-radius:12px; border:1px solid rgba(127,184,179,0.5);">
-            <div style="font-size:0.78rem; color:#2d2a26; opacity:0.75;">A ressarcir aos pais</div>
+            <div style="font-size:0.78rem; color:#2d2a26; opacity:0.75;">Total a ressarcir</div>
             <div style="font-size:1.35rem; font-weight:700; color:#2d2a26; line-height:1.15; margin-top:4px; white-space:nowrap;">{_euro_fmt(a_ressarcir)}</div>
             <div style="font-size:0.72rem; color:#2d2a26; opacity:0.6; margin-top:2px;">imóvel + selo + obras</div>
           </div>
           <div style="background:#e5dbf3; padding:14px 16px; border-radius:12px; border:1px solid rgba(179,157,219,0.5);">
-            <div style="font-size:0.78rem; color:#2d2a26; opacity:0.75;">Espaço pago em</div>
+            <div style="font-size:0.78rem; color:#2d2a26; opacity:0.75;">Imóvel totalmente ressarcido em</div>
             <div style="font-size:1.35rem; font-weight:700; color:#2d2a26; line-height:1.15; margin-top:4px; white-space:nowrap;">{pay_str}</div>
             <div style="font-size:0.72rem; color:#2d2a26; opacity:0.6; margin-top:2px;">{pay_sub}</div>
           </div>
@@ -717,26 +734,26 @@ with tabs[4]:
     margem_mes_1 = receita_mes_1 - custos_fixos_mes - contribuicao
     if pay is None:
         st.warning(
-            "Sem contribuição mensal não há ressarcimento aos pais. Aumenta o valor para começar a pagar."
+            "Sem contribuição mensal não há ressarcimento do imóvel. Aumenta o valor para começar a ressarcir."
         )
     elif margem_mes_1 < 0:
         st.warning(
             f"Com esta contribuição, no arranque a empresa perde **{_euro_fmt(-margem_mes_1)}** por mês. "
             "O crescimento pode recuperar isto, mas os fundadores podem ter de suportar a diferença "
-            "nos primeiros meses. Considera baixar a contribuição ou esticar o ressarcimento."
+            "nos primeiros meses. Considera baixar a contribuição ou esticar o prazo de ressarcimento."
         )
     else:
         st.success(
-            f"Com uma contribuição de **{_euro_fmt(contribuicao)} por mês**, o espaço fica totalmente "
+            f"Com uma contribuição de **{_euro_fmt(contribuicao)} por mês**, o imóvel fica totalmente "
             f"ressarcido em **{pay/12:,.1f} anos**. Nesse momento a empresa terá "
             f"**{caixa_ressarc_str}** em caixa e, depois disso, deixa de pagar a contribuição, "
             f"pelo que a margem passa a ser lucro dos fundadores. Ao fim de {anos_sim:,.0f} anos, "
             f"caixa acumulada de **{_euro_fmt(caixa_final_empresa)}**."
         )
 
-    # Gráfico 1: Ressarcimento aos pais
-    st.markdown("#### Ressarcimento aos pais do Pedro")
-    chart_df = sim[["Mês", "Total pago aos pais (EUR)"]].copy()
+    # Gráfico 1: Ressarcimento do imóvel
+    st.markdown("#### Ressarcimento do imóvel")
+    chart_df = sim[["Mês", "Total ressarcido (EUR)"]].copy()
     chart_df["Ano"] = chart_df["Mês"] / 12.0
 
     ressarc_area = alt.Chart(chart_df).mark_area(
@@ -749,9 +766,9 @@ with tabs[4]:
         ),
     ).encode(
         x=alt.X("Ano:Q", title="Anos desde o arranque"),
-        y=alt.Y("Total pago aos pais (EUR):Q", title="Total pago aos pais (EUR)"),
+        y=alt.Y("Total ressarcido (EUR):Q", title="Total ressarcido (EUR)"),
         tooltip=[alt.Tooltip("Ano:Q", format=".1f"),
-                 alt.Tooltip("Total pago aos pais (EUR):Q", format=",.0f")],
+                 alt.Tooltip("Total ressarcido (EUR):Q", format=",.0f")],
     )
     ressarc_target = alt.Chart(pd.DataFrame({"y": [a_ressarcir]})).mark_rule(
         color="#f6a55c", strokeDash=[6, 4], size=2,
@@ -773,7 +790,7 @@ with tabs[4]:
     st.altair_chart(chart1, use_container_width=True)
     st.caption(
         "A linha laranja marca o valor total a ressarcir. "
-        + (f"A linha violeta tracejada marca o ano {pay/12:.1f}, quando os pais recebem tudo de volta." if pay is not None else "")
+        + (f"A linha violeta tracejada marca o ano {pay/12:.1f}, quando o imóvel fica totalmente ressarcido." if pay is not None else "")
     )
 
     # Gráfico 2: Caixa da empresa
@@ -812,24 +829,26 @@ with tabs[4]:
     ).configure_view(strokeWidth=0)
     st.altair_chart(chart2, use_container_width=True)
     st.caption(
-        "Enquanto o imóvel não estiver pago, a empresa retira todos os meses a contribuição para os pais. "
+        "Enquanto o imóvel não estiver totalmente ressarcido, a empresa retira todos os meses a contribuição. "
         "Depois disso a margem fica toda em caixa. "
         + (f"A linha laranja tracejada marca o fim do ressarcimento (ano {pay/12:.1f})." if pay is not None else "")
     )
 
     # Milestones
     st.markdown("#### Marcos ao longo do tempo")
-    marcos_meses = [12, 60, 120, 240]
+    marcos_meses = [12, 60, 120, 240, 360]
     marcos = []
     for m in marcos_meses:
         if m <= len(sim):
             row = sim.iloc[m - 1]
+            receita_anual = sim.iloc[max(0, m-12):m]["Receita total (EUR)"].sum()
+            margem_anual = sim.iloc[max(0, m-12):m]["Margem mensal (EUR)"].sum()
             marcos.append({
                 "Fim do ano": m // 12,
-                "Receita bruta anual (EUR)": round(sim.iloc[max(0, m-12):m]["Receita total (EUR)"].sum(), 0),
-                "Margem anual (EUR)": round(sim.iloc[max(0, m-12):m]["Margem mensal (EUR)"].sum(), 0),
-                "Total pago aos pais (EUR)": round(row["Total pago aos pais (EUR)"], 0),
-                "Caixa da empresa no fim (EUR)": round(row["Caixa da empresa (EUR)"], 0),
+                "Receita bruta anual (EUR)": _smart_round(receita_anual),
+                "Margem anual (EUR)": _smart_round(margem_anual),
+                "Total ressarcido (EUR)": _smart_round(row["Total ressarcido (EUR)"]),
+                "Caixa da empresa no fim (EUR)": _smart_round(row["Caixa da empresa (EUR)"]),
             })
     if marcos:
         st.dataframe(pd.DataFrame(marcos), use_container_width=True, hide_index=True)
