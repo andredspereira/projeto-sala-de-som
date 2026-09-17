@@ -1,12 +1,13 @@
 """
 Projeto Sala de Som. Simulador financeiro.
-Streamlit app para planeamento de uma sala de ensaios e gravação de música em Portugal.
+Streamlit app para planeamento de duas salas de ensaios e gravacao em Portugal,
+com compra do imovel a pronto.
 """
 from __future__ import annotations
 
 import io
-from datetime import date
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -68,9 +69,7 @@ st.markdown(
         background-color: var(--pastel-violet);
         color: var(--ink);
     }
-    div[data-testid="stAlert"] {
-        border-radius: 12px;
-    }
+    div[data-testid="stAlert"] { border-radius: 12px; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -106,56 +105,68 @@ _check_password()
 # Defaults
 # ---------------------------------------------------------------------------
 DEFAULTS = {
-    "renda_mensal": 450.0,
-    "meses_caucao": 2.0,
-    "isolamento_esponjas": 800.0,
-    "eletricidade_setup": 250.0,
-    "mobiliario": 400.0,
-    "sinaletica_marketing_inicial": 150.0,
-    "registo_legal": 0.0,
-    "extras_iniciais": 200.0,
+    # Investimento inicial (compra do imovel a pronto)
+    "preco_imovel": 300000.0,
+    "pct_imposto_selo": 0.8,       # % sobre preco de compra
+    "obras_iniciais": 15000.0,
+    "mobiliario_material": 1000.0,
 
-    "renda_mensal_ongoing": 450.0,
-    "agua": 25.0,
-    "eletricidade": 90.0,
-    "internet": 30.0,
-    "seguros": 20.0,
-    "limpeza": 40.0,
-    "reparacoes_budget": 50.0,
-    "contabilista": 0.0,
-    "consumiveis": 20.0,
-    "marketing_mensal": 30.0,
-    "outros_mensais": 30.0,
+    # Custos mensais fixos
+    "pagamento_espaco": 1000.0,
+    "pct_imi_anual": 0.20,         # % anual sobre preco de compra (VPT tipicamente e mais baixo)
+    "agua": 30.0,
+    "eletricidade": 75.0,
+    "internet": 15.0,
+    "seguros": 40.0,
+    "consumiveis_gerais": 50.0,
+    "consumiveis_estudio": 25.0,
+    "armazenamento_online": 30.0,
+    "marketing_mensal": 5.0,
 
-    "preco_ensaio_hora": 10.0,
-    "horas_ensaio_mes": 50.0,
-    "preco_gravacao": 250.0,
-    "gravacoes_mes": 3.0,
-    "horas_por_gravacao": 2.0,
+    # Receita Sala 1 - Ensaios
+    "s1_preco_hora_ensaio": 9.0,
+    "s1_horas_ensaio_mes": 100.0,
+    "s1_preco_acordo": 120.0,
+    "s1_horas_por_acordo": 24.0,
+    "s1_num_acordos": 3.0,
 
-    "preco_ensaio_hora_s2": 12.0,
-    "horas_ensaio_mes_s2": 30.0,
-    "preco_gravacao_s2": 300.0,
-    "gravacoes_mes_s2": 2.0,
-    "horas_por_gravacao_s2": 2.0,
+    # Receita Sala 2 - Ensaios
+    "s2_preco_hora_ensaio": 15.0,
+    "s2_horas_ensaio_mes": 50.0,
+    "s2_preco_extra_gravado": 5.0,
+    "s2_horas_ensaio_gravado": 25.0,
+    "s2_preco_acordo": 180.0,
+    "s2_horas_por_acordo": 24.0,
+    "s2_num_acordos": 1.0,
 
-    "iva_aplicavel": False,
-    "taxa_irs_estimada": 0.0,
+    # Receita Sala 2 - Gravacao
+    "s2_horas_gravacao_mes": 5.0,
+    "s2_preco_hora_gravacao": 30.0,
+    "s2_faixas_mistura_mes": 2.0,
+    "s2_preco_faixa_mistura": 100.0,
 
-    "meses_simulacao": 12,
-    "crescimento_mensal_pct": 5.0,
+    # Simulacao
+    "meses_simulacao": 240,
+    "crescimento_mensal_pct": 2.0,
     "cap_horas_ensaio": 200.0,
-    "cap_gravacoes": 15.0,
-    "mes_inicio": date.today().replace(day=1),
-
-    "invest_externo_total": 0.0,
-    "invest_externo_mes_entrada": 1,
+    "cap_horas_gravacao": 50.0,
+    "cap_faixas_mistura": 10.0,
 }
+
+ARTISTAS_INICIAIS = [
+    {"Artista": "Inês Rebelo (Salacia)", "Estilo": "", "Notas": ""},
+    {"Artista": "Giblets and Gravy", "Estilo": "", "Notas": ""},
+    {"Artista": "Samuel Dias", "Estilo": "", "Notas": ""},
+    {"Artista": "Razy", "Estilo": "", "Notas": ""},
+    {"Artista": "Diogo Verdelindo", "Estilo": "", "Notas": ""},
+    {"Artista": "SubRosa", "Estilo": "", "Notas": ""},
+]
 
 
 def _init_state():
     for k, v in DEFAULTS.items():
         st.session_state.setdefault(k, v)
+    st.session_state.setdefault("catalogo_artistas", pd.DataFrame(ARTISTAS_INICIAIS))
 
 
 _init_state()
@@ -164,10 +175,11 @@ _init_state()
 def _reset_defaults():
     for k, v in DEFAULTS.items():
         st.session_state[k] = v
+    st.session_state["catalogo_artistas"] = pd.DataFrame(ARTISTAS_INICIAIS)
 
 
 # ---------------------------------------------------------------------------
-# Sidebar. Parâmetros editáveis
+# Sidebar. Parametros editaveis
 # ---------------------------------------------------------------------------
 with st.sidebar:
     st.header("Parâmetros")
@@ -178,204 +190,290 @@ with st.sidebar:
         st.rerun()
 
     with st.expander("Investimento inicial", expanded=False):
-        st.number_input("Renda mensal do espaço (EUR)", key="renda_mensal", min_value=0.0, step=25.0)
-        st.number_input("Meses de renda adiantados (caução mais 1 mês)", key="meses_caucao", min_value=0.0, step=0.5)
-        st.number_input("Isolamento acústico e esponjas (EUR)", key="isolamento_esponjas", min_value=0.0, step=50.0)
-        st.number_input("Ligações eléctricas e adaptações (EUR)", key="eletricidade_setup", min_value=0.0, step=25.0)
-        st.number_input("Mobiliário básico (EUR)", key="mobiliario", min_value=0.0, step=25.0)
-        st.number_input("Sinalética e marketing inicial (EUR)", key="sinaletica_marketing_inicial", min_value=0.0, step=25.0)
-        st.number_input("Registo legal (associação ou empresa) (EUR)", key="registo_legal", min_value=0.0, step=25.0,
-                        help="0 se ficarem só na atividade aberta do André.")
-        st.number_input("Outros custos iniciais (EUR)", key="extras_iniciais", min_value=0.0, step=25.0)
+        st.number_input("Preço do imóvel (EUR)", key="preco_imovel", min_value=0.0, step=1000.0,
+                        help="Compra a pronto, sem empréstimo bancário.")
+        st.number_input("Imposto de selo na compra (% sobre preço)",
+                        key="pct_imposto_selo", min_value=0.0, max_value=10.0, step=0.1,
+                        help="Em Portugal, imposto de selo em transmissões onerosas de imóveis é 0,8%.")
+        st.number_input("Obras (inclui tratamento acústico) (EUR)",
+                        key="obras_iniciais", min_value=0.0, step=500.0)
+        st.number_input("Mobiliário e material (EUR)",
+                        key="mobiliario_material", min_value=0.0, step=100.0)
 
     with st.expander("Custos mensais fixos", expanded=False):
-        st.number_input("Renda mensal (EUR)", key="renda_mensal_ongoing", min_value=0.0, step=25.0)
+        st.number_input("Pagamento do espaço (EUR)", key="pagamento_espaco", min_value=0.0, step=25.0,
+                        help="Condomínio, fundo de manutenção reservado, ou pagamento aos vossos pais. "
+                             "Não é renda porque o imóvel é comprado a pronto.")
+        st.number_input("IMI anual (% sobre preço do imóvel)",
+                        key="pct_imi_anual", min_value=0.0, max_value=2.0, step=0.05,
+                        help="IMI incide sobre o VPT, tipicamente inferior ao preço de compra. "
+                             "0,20% do preço de compra é uma aproximação conservadora.")
         st.number_input("Água (EUR)", key="agua", min_value=0.0, step=5.0)
         st.number_input("Eletricidade (EUR)", key="eletricidade", min_value=0.0, step=5.0)
         st.number_input("Internet (EUR)", key="internet", min_value=0.0, step=5.0)
         st.number_input("Seguros (EUR)", key="seguros", min_value=0.0, step=5.0)
-        st.number_input("Limpeza (EUR)", key="limpeza", min_value=0.0, step=5.0)
-        st.number_input("Budget reparações (EUR)", key="reparacoes_budget", min_value=0.0, step=5.0)
-        st.number_input("Contabilista (EUR)", key="contabilista", min_value=0.0, step=10.0,
-                        help="Atividade aberta em regime simplificado pode dispensar; empresa ou associação normalmente não.")
-        st.number_input("Consumíveis, cabos, cordas, pilhas (EUR)", key="consumiveis", min_value=0.0, step=5.0)
+        st.number_input("Consumíveis gerais (limpeza, café, chá) (EUR)",
+                        key="consumiveis_gerais", min_value=0.0, step=5.0)
+        st.number_input("Consumíveis estúdio (cabos, cordas, pilhas) (EUR)",
+                        key="consumiveis_estudio", min_value=0.0, step=5.0)
+        st.number_input("Armazenamento online (EUR)", key="armazenamento_online", min_value=0.0, step=5.0)
         st.number_input("Marketing mensal (EUR)", key="marketing_mensal", min_value=0.0, step=5.0)
-        st.number_input("Outros custos mensais (EUR)", key="outros_mensais", min_value=0.0, step=5.0)
 
-    with st.expander("Receita. Sala 1", expanded=True):
-        st.number_input("Preço por hora de ensaio (EUR)", key="preco_ensaio_hora", min_value=0.0, step=1.0)
-        st.number_input("Horas de ensaio no 1.º mês", key="horas_ensaio_mes", min_value=0.0, step=5.0)
-        st.number_input("Preço por gravação (EUR por faixa)", key="preco_gravacao", min_value=0.0, step=10.0)
-        st.number_input("Gravações no 1.º mês", key="gravacoes_mes", min_value=0.0, step=1.0)
-        st.number_input("Horas por gravação", key="horas_por_gravacao", min_value=0.0, step=0.5)
+    with st.expander("Receita. Sala 1. Ensaios", expanded=True):
+        st.number_input("Preço por hora de ensaio (EUR)", key="s1_preco_hora_ensaio", min_value=0.0, step=1.0)
+        st.number_input("Horas de ensaio hora-a-hora por mês", key="s1_horas_ensaio_mes",
+                        min_value=0.0, step=5.0)
+        st.markdown("**Acordo Mensal**")
+        st.number_input("Preço do acordo mensal (EUR)", key="s1_preco_acordo", min_value=0.0, step=5.0)
+        st.number_input("Horas incluídas por acordo", key="s1_horas_por_acordo", min_value=0.0, step=1.0)
+        st.number_input("Número de acordos mensais", key="s1_num_acordos", min_value=0.0, step=1.0)
 
-    with st.expander("Receita. Sala 2", expanded=True):
-        st.caption("Sala mais equipada, com preço base ligeiramente superior.")
-        st.number_input("Preço por hora de ensaio (EUR)", key="preco_ensaio_hora_s2", min_value=0.0, step=1.0)
-        st.number_input("Horas de ensaio no 1.º mês", key="horas_ensaio_mes_s2", min_value=0.0, step=5.0)
-        st.number_input("Preço por gravação (EUR por faixa)", key="preco_gravacao_s2", min_value=0.0, step=10.0)
-        st.number_input("Gravações no 1.º mês", key="gravacoes_mes_s2", min_value=0.0, step=1.0)
-        st.number_input("Horas por gravação", key="horas_por_gravacao_s2", min_value=0.0, step=0.5)
+    with st.expander("Receita. Sala 2. Ensaios", expanded=True):
+        st.number_input("Preço por hora de ensaio (EUR)", key="s2_preco_hora_ensaio", min_value=0.0, step=1.0)
+        st.number_input("Horas de ensaio hora-a-hora por mês", key="s2_horas_ensaio_mes",
+                        min_value=0.0, step=5.0)
+        st.markdown("**Ensaio gravado (add-on, sem mistura)**")
+        st.number_input("Preço extra por hora de ensaio gravado (EUR)",
+                        key="s2_preco_extra_gravado", min_value=0.0, step=1.0,
+                        help="Adicional cobrado por cima do preço-hora quando o ensaio é gravado.")
+        st.number_input("Horas de ensaio gravado por mês", key="s2_horas_ensaio_gravado",
+                        min_value=0.0, step=1.0,
+                        help="Subconjunto das horas de ensaio Sala 2 que são gravadas.")
+        st.markdown("**Acordo Mensal**")
+        st.number_input("Preço do acordo mensal (EUR)", key="s2_preco_acordo", min_value=0.0, step=5.0)
+        st.number_input("Horas incluídas por acordo", key="s2_horas_por_acordo", min_value=0.0, step=1.0)
+        st.number_input("Número de acordos mensais", key="s2_num_acordos", min_value=0.0, step=1.0)
+
+    with st.expander("Receita. Sala 2. Gravação", expanded=True):
+        st.number_input("Horas de gravação profissional por mês",
+                        key="s2_horas_gravacao_mes", min_value=0.0, step=1.0)
+        st.number_input("Preço por hora de gravação (EUR)",
+                        key="s2_preco_hora_gravacao", min_value=0.0, step=5.0)
+        st.number_input("Faixas para mistura por mês", key="s2_faixas_mistura_mes",
+                        min_value=0.0, step=1.0)
+        st.number_input("Preço por faixa de mistura (EUR)", key="s2_preco_faixa_mistura",
+                        min_value=0.0, step=10.0)
 
     with st.expander("Simulação", expanded=False):
-        st.number_input("Meses a simular", key="meses_simulacao", min_value=1, max_value=60, step=1)
+        st.number_input("Meses a simular", key="meses_simulacao",
+                        min_value=1, max_value=600, step=12,
+                        help="240 meses = 20 anos.")
         st.number_input("Crescimento de ocupação por mês (%)", key="crescimento_mensal_pct",
-                        min_value=-50.0, max_value=100.0, step=1.0,
-                        help="Aplicado a horas de ensaio e a gravações. Composto mês a mês.")
-        st.number_input("Tecto de horas de ensaio por mês, por sala", key="cap_horas_ensaio", min_value=0.0, step=10.0,
-                        help="Limite realista para cada sala. 8h por dia vezes 25 dias dá cerca de 200h. "
-                             "As gravações ocupam o mesmo espaço da respectiva sala.")
-        st.number_input("Tecto de gravações por mês, por sala", key="cap_gravacoes", min_value=0.0, step=1.0)
-        st.date_input("Mês de arranque", key="mes_inicio")
-
-    with st.expander("Investimento externo", expanded=False):
-        st.number_input("Total emprestado por amigos (EUR)", key="invest_externo_total", min_value=0.0, step=100.0)
-        st.number_input("Mês em que entra o empréstimo (1 igual ao mês inicial)",
-                        key="invest_externo_mes_entrada", min_value=1, max_value=60, step=1)
-
-    with st.expander("Impostos (estimativa grosseira)", expanded=False):
-        st.checkbox("Aplicar IVA às receitas (23%)", key="iva_aplicavel",
-                    help="Atividade aberta abaixo de cerca de 15 mil euros por ano de faturação pode estar isenta "
-                         "(art. 53.º do CIVA). Ativa se ultrapassarem esse limite ou se optarem por regime normal.")
-        st.number_input("Taxa efetiva de IRS ou IRC estimada (%)", key="taxa_irs_estimada",
-                        min_value=0.0, max_value=50.0, step=1.0,
-                        help="Deixa em 0 para uma leitura conservadora do cashflow bruto.")
+                        min_value=-10.0, max_value=20.0, step=0.5,
+                        help="Aplicado a horas, acordos, gravações e faixas. Composto mês a mês.")
+        st.number_input("Tecto de horas de ensaio por mês, por sala",
+                        key="cap_horas_ensaio", min_value=0.0, step=10.0,
+                        help="Cap combinado. Inclui horas hora-a-hora mais horas dos acordos mensais.")
+        st.number_input("Tecto de horas de gravação por mês", key="cap_horas_gravacao",
+                        min_value=0.0, step=5.0)
+        st.number_input("Tecto de faixas de mistura por mês", key="cap_faixas_mistura",
+                        min_value=0.0, step=1.0)
 
 
 # ---------------------------------------------------------------------------
-# Cálculos partilhados
+# Calculos: Investimento inicial
 # ---------------------------------------------------------------------------
 def investimento_inicial_df() -> pd.DataFrame:
     s = st.session_state
+    imposto_selo = s.preco_imovel * s.pct_imposto_selo / 100.0
     rows = [
-        ("Renda adiantada e caução", s.renda_mensal * s.meses_caucao),
-        ("Isolamento acústico e esponjas", s.isolamento_esponjas),
-        ("Ligações eléctricas e adaptações", s.eletricidade_setup),
-        ("Mobiliário básico", s.mobiliario),
-        ("Sinalética e marketing inicial", s.sinaletica_marketing_inicial),
-        ("Registo legal", s.registo_legal),
-        ("Outros custos iniciais", s.extras_iniciais),
+        ("Preço de aquisição do imóvel", s.preco_imovel),
+        (f"Imposto de selo ({s.pct_imposto_selo:.2f}%)", imposto_selo),
+        ("Obras (inclui tratamento acústico)", s.obras_iniciais),
+        ("Mobiliário e material", s.mobiliario_material),
     ]
     df = pd.DataFrame(rows, columns=["Rubrica", "Valor (EUR)"])
     df.loc[len(df)] = ["TOTAL", df["Valor (EUR)"].sum()]
     return df
 
 
+def investimento_inicial_total() -> float:
+    return float(investimento_inicial_df().iloc[-1]["Valor (EUR)"])
+
+
+# ---------------------------------------------------------------------------
+# Calculos: Custos mensais
+# ---------------------------------------------------------------------------
+def imi_mensal() -> float:
+    s = st.session_state
+    return s.preco_imovel * s.pct_imi_anual / 100.0 / 12.0
+
+
 def custos_mensais_df() -> pd.DataFrame:
     s = st.session_state
     rows = [
-        ("Renda", s.renda_mensal_ongoing),
+        ("Pagamento do espaço", s.pagamento_espaco),
+        (f"IMI mensalizado ({s.pct_imi_anual:.2f}% ao ano)", imi_mensal()),
         ("Água", s.agua),
         ("Eletricidade", s.eletricidade),
         ("Internet", s.internet),
         ("Seguros", s.seguros),
-        ("Limpeza", s.limpeza),
-        ("Reparações (budget)", s.reparacoes_budget),
-        ("Contabilista", s.contabilista),
-        ("Consumíveis", s.consumiveis),
-        ("Marketing", s.marketing_mensal),
-        ("Outros", s.outros_mensais),
+        ("Consumíveis gerais", s.consumiveis_gerais),
+        ("Consumíveis estúdio", s.consumiveis_estudio),
+        ("Armazenamento online", s.armazenamento_online),
+        ("Marketing mensal", s.marketing_mensal),
     ]
     df = pd.DataFrame(rows, columns=["Rubrica", "Valor (EUR)"])
     df.loc[len(df)] = ["TOTAL por mês", df["Valor (EUR)"].sum()]
     return df
 
 
-def receita_base_mes() -> dict:
+def custos_mensais_total() -> float:
+    return float(custos_mensais_df().iloc[-1]["Valor (EUR)"])
+
+
+# ---------------------------------------------------------------------------
+# Calculos: Receita
+# ---------------------------------------------------------------------------
+def _cap_ensaios(horas: float, acordos: float, horas_por_acordo: float, cap: float):
+    """Cap combinado horas + 24 h por acordo <= cap. Corta acordos primeiro, depois horas."""
+    total = horas + horas_por_acordo * acordos
+    if total <= cap or cap <= 0:
+        return horas, acordos
+    max_acordos = cap / horas_por_acordo if horas_por_acordo > 0 else 0.0
+    acordos_c = min(acordos, max_acordos)
+    horas_c = max(0.0, min(horas, cap - horas_por_acordo * acordos_c))
+    return horas_c, acordos_c
+
+
+def receita_sala1_ensaios(horas: float, acordos: float) -> dict:
     s = st.session_state
-    # Sala 1
-    ens1 = s.preco_ensaio_hora * s.horas_ensaio_mes
-    grv1 = s.preco_gravacao * s.gravacoes_mes
-    hocup1 = s.horas_ensaio_mes + s.gravacoes_mes * s.horas_por_gravacao
-    # Sala 2
-    ens2 = s.preco_ensaio_hora_s2 * s.horas_ensaio_mes_s2
-    grv2 = s.preco_gravacao_s2 * s.gravacoes_mes_s2
-    hocup2 = s.horas_ensaio_mes_s2 + s.gravacoes_mes_s2 * s.horas_por_gravacao_s2
+    r_horas = horas * s.s1_preco_hora_ensaio
+    r_acordos = acordos * s.s1_preco_acordo
     return {
-        "Horas de ensaio Sala 1": s.horas_ensaio_mes,
-        "Receita ensaios Sala 1 (EUR)": ens1,
-        "Gravações Sala 1": s.gravacoes_mes,
-        "Receita gravações Sala 1 (EUR)": grv1,
-        "Horas de ocupação Sala 1": hocup1,
-        "Horas de ensaio Sala 2": s.horas_ensaio_mes_s2,
-        "Receita ensaios Sala 2 (EUR)": ens2,
-        "Gravações Sala 2": s.gravacoes_mes_s2,
-        "Receita gravações Sala 2 (EUR)": grv2,
-        "Horas de ocupação Sala 2": hocup2,
-        "Receita bruta por mês (EUR)": ens1 + grv1 + ens2 + grv2,
+        "Horas hora-a-hora": horas,
+        "Receita horas (EUR)": r_horas,
+        "Acordos mensais": acordos,
+        "Receita acordos (EUR)": r_acordos,
+        "Total Sala 1 Ensaios (EUR)": r_horas + r_acordos,
     }
 
 
-def simular_meses() -> pd.DataFrame:
+def receita_sala2_ensaios(horas: float, horas_gravado: float, acordos: float) -> dict:
+    s = st.session_state
+    r_horas = horas * s.s2_preco_hora_ensaio
+    r_extra = horas_gravado * s.s2_preco_extra_gravado
+    r_acordos = acordos * s.s2_preco_acordo
+    return {
+        "Horas hora-a-hora": horas,
+        "Receita horas (EUR)": r_horas,
+        "Horas de ensaio gravado": horas_gravado,
+        "Receita extra ensaio gravado (EUR)": r_extra,
+        "Acordos mensais": acordos,
+        "Receita acordos (EUR)": r_acordos,
+        "Total Sala 2 Ensaios (EUR)": r_horas + r_extra + r_acordos,
+    }
+
+
+def receita_sala2_gravacao(horas_grav: float, faixas: float) -> dict:
+    s = st.session_state
+    r_grav = horas_grav * s.s2_preco_hora_gravacao
+    r_mist = faixas * s.s2_preco_faixa_mistura
+    return {
+        "Horas de gravação profissional": horas_grav,
+        "Receita gravação (EUR)": r_grav,
+        "Faixas para mistura": faixas,
+        "Receita mistura (EUR)": r_mist,
+        "Total Sala 2 Gravação (EUR)": r_grav + r_mist,
+    }
+
+
+def receita_base_mes() -> dict:
+    s = st.session_state
+    # Sala 1
+    h1, a1 = _cap_ensaios(s.s1_horas_ensaio_mes, s.s1_num_acordos,
+                          s.s1_horas_por_acordo, s.cap_horas_ensaio)
+    # Sala 2 ensaios
+    h2, a2 = _cap_ensaios(s.s2_horas_ensaio_mes, s.s2_num_acordos,
+                          s.s2_horas_por_acordo, s.cap_horas_ensaio)
+    hg = min(s.s2_horas_ensaio_gravado, h2)  # ensaio gravado é subconjunto
+    # Gravação
+    hgrav = min(s.s2_horas_gravacao_mes, s.cap_horas_gravacao)
+    faixas = min(s.s2_faixas_mistura_mes, s.cap_faixas_mistura)
+
+    r_s1 = receita_sala1_ensaios(h1, a1)
+    r_s2e = receita_sala2_ensaios(h2, hg, a2)
+    r_s2g = receita_sala2_gravacao(hgrav, faixas)
+
+    total = (r_s1["Total Sala 1 Ensaios (EUR)"] +
+             r_s2e["Total Sala 2 Ensaios (EUR)"] +
+             r_s2g["Total Sala 2 Gravação (EUR)"])
+
+    return {
+        "Sala 1 Ensaios": r_s1,
+        "Sala 2 Ensaios": r_s2e,
+        "Sala 2 Gravação": r_s2g,
+        "Total geral (EUR)": total,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Simulação mensal
+# ---------------------------------------------------------------------------
+def simular() -> pd.DataFrame:
     s = st.session_state
     n = int(s.meses_simulacao)
-    crescimento = 1 + s.crescimento_mensal_pct / 100.0
-    custo_fixo = custos_mensais_df().iloc[-1]["Valor (EUR)"]
+    g = 1.0 + s.crescimento_mensal_pct / 100.0
+    custo_fixo = custos_mensais_total()
+    invest_ini = investimento_inicial_total()
 
-    horas_ensaio_s1 = s.horas_ensaio_mes
-    gravacoes_s1 = s.gravacoes_mes
-    horas_ensaio_s2 = s.horas_ensaio_mes_s2
-    gravacoes_s2 = s.gravacoes_mes_s2
+    # Valores iniciais
+    h1 = float(s.s1_horas_ensaio_mes)
+    a1 = float(s.s1_num_acordos)
+    h2 = float(s.s2_horas_ensaio_mes)
+    hg = float(s.s2_horas_ensaio_gravado)
+    a2 = float(s.s2_num_acordos)
+    hgrav = float(s.s2_horas_gravacao_mes)
+    faixas = float(s.s2_faixas_mistura_mes)
 
-    invest_inicial_total = investimento_inicial_df().iloc[-1]["Valor (EUR)"]
-
+    caixa = -invest_ini
     linhas = []
-    caixa_acumulada = -invest_inicial_total
-    mes0 = s.mes_inicio
 
-    for i in range(n):
-        m_horas_s1 = min(horas_ensaio_s1, s.cap_horas_ensaio)
-        m_grav_s1 = min(gravacoes_s1, s.cap_gravacoes)
-        m_horas_s2 = min(horas_ensaio_s2, s.cap_horas_ensaio)
-        m_grav_s2 = min(gravacoes_s2, s.cap_gravacoes)
+    for i in range(1, n + 1):
+        h1_c, a1_c = _cap_ensaios(h1, a1, s.s1_horas_por_acordo, s.cap_horas_ensaio)
+        h2_c, a2_c = _cap_ensaios(h2, a2, s.s2_horas_por_acordo, s.cap_horas_ensaio)
+        hg_c = min(hg, h2_c)
+        hgrav_c = min(hgrav, s.cap_horas_gravacao)
+        faixas_c = min(faixas, s.cap_faixas_mistura)
 
-        rec_ens_s1 = m_horas_s1 * s.preco_ensaio_hora
-        rec_grv_s1 = m_grav_s1 * s.preco_gravacao
-        rec_ens_s2 = m_horas_s2 * s.preco_ensaio_hora_s2
-        rec_grv_s2 = m_grav_s2 * s.preco_gravacao_s2
-
-        receita_s1 = rec_ens_s1 + rec_grv_s1
-        receita_s2 = rec_ens_s2 + rec_grv_s2
-        receita_bruta = receita_s1 + receita_s2
-
-        iva = receita_bruta * 0.23 / 1.23 if s.iva_aplicavel else 0.0
-        receita_liq_iva = receita_bruta - iva
-
-        margem_pre_imposto = receita_liq_iva - custo_fixo
-        irs = max(margem_pre_imposto, 0) * (s.taxa_irs_estimada / 100.0)
-        margem_liq = margem_pre_imposto - irs
-
-        invest_externo_mes = s.invest_externo_total if (i + 1) == int(s.invest_externo_mes_entrada) else 0.0
-        caixa_acumulada += margem_liq + invest_externo_mes
-
-        year = mes0.year + (mes0.month - 1 + i) // 12
-        month = (mes0.month - 1 + i) % 12 + 1
-        mes_label = f"{year}-{month:02d}"
+        r_s1 = h1_c * s.s1_preco_hora_ensaio + a1_c * s.s1_preco_acordo
+        r_s2e = (h2_c * s.s2_preco_hora_ensaio
+                 + hg_c * s.s2_preco_extra_gravado
+                 + a2_c * s.s2_preco_acordo)
+        r_s2g = hgrav_c * s.s2_preco_hora_gravacao + faixas_c * s.s2_preco_faixa_mistura
+        receita = r_s1 + r_s2e + r_s2g
+        margem = receita - custo_fixo
+        caixa += margem
 
         linhas.append({
-            "Mês": mes_label,
-            "Horas Sala 1": round(m_horas_s1, 1),
-            "Gravações Sala 1": round(m_grav_s1, 2),
-            "Receita Sala 1 (EUR)": round(receita_s1, 2),
-            "Horas Sala 2": round(m_horas_s2, 1),
-            "Gravações Sala 2": round(m_grav_s2, 2),
-            "Receita Sala 2 (EUR)": round(receita_s2, 2),
-            "Receita bruta (EUR)": round(receita_bruta, 2),
-            "IVA a entregar (EUR)": round(iva, 2),
+            "Mês": i,
+            "Ano": (i - 1) // 12 + 1,
+            "Receita Sala 1 Ensaios (EUR)": round(r_s1, 2),
+            "Receita Sala 2 Ensaios (EUR)": round(r_s2e, 2),
+            "Receita Sala 2 Gravação (EUR)": round(r_s2g, 2),
+            "Receita total (EUR)": round(receita, 2),
             "Custos fixos (EUR)": round(custo_fixo, 2),
-            "Margem pré-imposto (EUR)": round(margem_pre_imposto, 2),
-            "IRS ou IRC estimado (EUR)": round(irs, 2),
-            "Margem líquida (EUR)": round(margem_liq, 2),
-            "Investimento externo (EUR)": round(invest_externo_mes, 2),
-            "Caixa acumulada (EUR)": round(caixa_acumulada, 2),
+            "Margem mensal (EUR)": round(margem, 2),
+            "Caixa acumulada (EUR)": round(caixa, 2),
         })
 
-        horas_ensaio_s1 *= crescimento
-        gravacoes_s1 *= crescimento
-        horas_ensaio_s2 *= crescimento
-        gravacoes_s2 *= crescimento
+        # Crescimento composto
+        h1 *= g
+        a1 *= g
+        h2 *= g
+        hg *= g
+        a2 *= g
+        hgrav *= g
+        faixas *= g
 
     return pd.DataFrame(linhas)
+
+
+def payback_meses(sim: pd.DataFrame) -> int | None:
+    linha = sim[sim["Caixa acumulada (EUR)"] >= 0].head(1)
+    if linha.empty:
+        return None
+    return int(linha.iloc[0]["Mês"])
 
 
 # ---------------------------------------------------------------------------
@@ -388,11 +486,15 @@ def build_excel() -> bytes:
         custos_mensais_df().to_excel(writer, sheet_name="Custos mensais", index=False)
 
         rec = receita_base_mes()
-        pd.DataFrame(list(rec.items()), columns=["Métrica", "Valor"]).to_excel(
-            writer, sheet_name="Receita mes base", index=False
-        )
+        rows = []
+        for bloco in ["Sala 1 Ensaios", "Sala 2 Ensaios", "Sala 2 Gravação"]:
+            for k, v in rec[bloco].items():
+                rows.append({"Bloco": bloco, "Métrica": k, "Valor": v})
+        rows.append({"Bloco": "TOTAL", "Métrica": "Receita bruta por mês (EUR)", "Valor": rec["Total geral (EUR)"]})
+        pd.DataFrame(rows).to_excel(writer, sheet_name="Receita mensal", index=False)
 
-        simular_meses().to_excel(writer, sheet_name="Simulacao mensal", index=False)
+        st.session_state["catalogo_artistas"].to_excel(writer, sheet_name="Catalogo artistas", index=False)
+        simular().to_excel(writer, sheet_name="Simulacao mensal", index=False)
 
         params = {k: st.session_state.get(k) for k in DEFAULTS.keys()}
         pd.DataFrame(list(params.items()), columns=["Parâmetro", "Valor"]).to_excel(
@@ -411,7 +513,8 @@ tabs = st.tabs([
     "Investimento inicial",
     "Custos mensais",
     "Receita",
-    "Simulação mensal",
+    "Catálogo de Artistas",
+    "Sustentabilidade",
     "Download",
 ])
 
@@ -422,7 +525,10 @@ with tabs[0]:
     st.dataframe(df, use_container_width=True, hide_index=True)
     total = df.iloc[-1]["Valor (EUR)"]
     st.metric("Total de investimento inicial", f"EUR {total:,.2f}")
-    st.caption("Edita qualquer valor na barra lateral em Investimento inicial.")
+    st.caption(
+        "Compra do imóvel a pronto, sem empréstimo bancário. "
+        "Ajusta o preço, o imposto de selo, as obras e o mobiliário na barra lateral."
+    )
 
 # --- Custos mensais ---
 with tabs[1]:
@@ -434,61 +540,196 @@ with tabs[1]:
 
 # --- Receita ---
 with tabs[2]:
-    st.subheader("Receita no mês base (o 1.º mês da simulação)")
+    st.subheader("Receita mensal")
     rec = receita_base_mes()
-    df = pd.DataFrame(list(rec.items()), columns=["Métrica", "Valor"])
-    st.dataframe(df, use_container_width=True, hide_index=True)
 
-    custo_fix = custos_mensais_df().iloc[-1]["Valor (EUR)"]
-    receita_bruta = rec["Receita bruta por mês (EUR)"]
+    st.markdown("#### Sala 1. Ensaios")
+    df1 = pd.DataFrame(list(rec["Sala 1 Ensaios"].items()), columns=["Métrica", "Valor"])
+    st.dataframe(df1, use_container_width=True, hide_index=True)
+
+    st.markdown("#### Sala 2. Ensaios")
+    df2 = pd.DataFrame(list(rec["Sala 2 Ensaios"].items()), columns=["Métrica", "Valor"])
+    st.dataframe(df2, use_container_width=True, hide_index=True)
+
+    st.markdown("#### Sala 2. Gravação")
+    df3 = pd.DataFrame(list(rec["Sala 2 Gravação"].items()), columns=["Métrica", "Valor"])
+    st.dataframe(df3, use_container_width=True, hide_index=True)
+
+    st.markdown("---")
+    custo_fix = custos_mensais_total()
+    receita_bruta = rec["Total geral (EUR)"]
     col1, col2, col3 = st.columns(3)
     col1.metric("Receita bruta por mês", f"EUR {receita_bruta:,.2f}")
     col2.metric("Custos fixos por mês", f"EUR {custo_fix:,.2f}")
-    col3.metric("Margem bruta por mês", f"EUR {receita_bruta - custo_fix:,.2f}",
-                delta=f"{(receita_bruta - custo_fix):.0f} EUR")
+    col3.metric("Margem por mês", f"EUR {receita_bruta - custo_fix:,.2f}")
 
-    horas_ocupacao_max = 8 * 25
-    total_ocup = rec["Horas de ocupação Sala 1"] + rec["Horas de ocupação Sala 2"]
-    st.caption(
-        f"Ocupação atual: Sala 1 com {rec['Horas de ocupação Sala 1']:.1f} h, "
-        f"Sala 2 com {rec['Horas de ocupação Sala 2']:.1f} h (total {total_ocup:.1f} h). "
-        f"Capacidade teórica por sala: cerca de {horas_ocupacao_max} h por mês "
-        f"(8h por dia vezes 25 dias)."
-    )
-
-# --- Simulação mensal ---
+# --- Catálogo de Artistas ---
 with tabs[3]:
-    st.subheader("Simulação mês a mês")
+    st.subheader("Catálogo de Artistas")
     st.caption(
-        "A ocupação cresce à taxa que definires na barra lateral, com tetos realistas. "
-        "O investimento inicial é lançado como caixa negativa no arranque."
+        "Lista de artistas que esperamos que usem o espaço. Podes editar, "
+        "adicionar linhas (última linha em branco) e apagar directamente na tabela."
     )
-    sim = simular_meses()
-    st.dataframe(sim, use_container_width=True, hide_index=True)
+    edited = st.data_editor(
+        st.session_state["catalogo_artistas"],
+        num_rows="dynamic",
+        use_container_width=True,
+        column_config={
+            "Artista": st.column_config.TextColumn("Artista", required=True),
+            "Estilo": st.column_config.TextColumn("Estilo"),
+            "Notas": st.column_config.TextColumn("Notas"),
+        },
+        key="catalogo_editor",
+    )
+    st.session_state["catalogo_artistas"] = edited
+    st.metric("Total de artistas no catálogo", len(edited))
 
-    st.markdown("#### Caixa acumulada")
-    st.line_chart(sim.set_index("Mês")[["Caixa acumulada (EUR)"]])
+# --- Sustentabilidade ---
+with tabs[4]:
+    st.subheader("Sustentabilidade do projeto")
 
-    st.markdown("#### Receita vs custos")
-    st.bar_chart(sim.set_index("Mês")[["Receita bruta (EUR)", "Custos fixos (EUR)"]])
+    sim = simular()
+    invest_ini = investimento_inicial_total()
+    custo_fix = custos_mensais_total()
+    receita_base = receita_base_mes()["Total geral (EUR)"]
+    margem_base = receita_base - custo_fix
 
-    breakeven_row = sim[sim["Caixa acumulada (EUR)"] >= 0].head(1)
-    if breakeven_row.empty:
+    pay = payback_meses(sim)
+    anos_sim = int(st.session_state["meses_simulacao"]) / 12.0
+    caixa_final = float(sim.iloc[-1]["Caixa acumulada (EUR)"])
+
+    def _euro_fmt(v: float) -> str:
+        return f"€ {v:,.0f}".replace(",", " ")
+
+    if pay is not None:
+        pay_str = f"{pay/12:,.1f} anos"
+        pay_sub = f"{pay} meses"
+    else:
+        pay_str = "não atinge"
+        pay_sub = "ajusta parâmetros"
+
+    st.markdown(
+        f"""
+        <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px; margin-bottom:1rem;">
+          <div style="background:#cfe6e3; padding:16px 18px; border-radius:12px; border:1px solid rgba(127,184,179,0.5);">
+            <div style="font-size:0.85rem; color:#2d2a26; opacity:0.75;">Investimento inicial</div>
+            <div style="font-size:1.6rem; font-weight:700; color:#2d2a26; line-height:1.15; margin-top:6px;">{_euro_fmt(invest_ini)}</div>
+          </div>
+          <div style="background:#e5dbf3; padding:16px 18px; border-radius:12px; border:1px solid rgba(179,157,219,0.5);">
+            <div style="font-size:0.85rem; color:#2d2a26; opacity:0.75;">Imóvel pago em</div>
+            <div style="font-size:1.6rem; font-weight:700; color:#2d2a26; line-height:1.15; margin-top:6px;">{pay_str}</div>
+            <div style="font-size:0.8rem; color:#2d2a26; opacity:0.6; margin-top:2px;">{pay_sub}</div>
+          </div>
+          <div style="background:#fbecc4; padding:16px 18px; border-radius:12px; border:1px solid rgba(246,215,138,0.6);">
+            <div style="font-size:0.85rem; color:#2d2a26; opacity:0.75;">Caixa após {anos_sim:,.0f} anos</div>
+            <div style="font-size:1.6rem; font-weight:700; color:#2d2a26; line-height:1.15; margin-top:6px;">{_euro_fmt(caixa_final)}</div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Mensagem principal
+    if pay is not None and caixa_final > 0:
+        st.success(
+            f"Com uma estimativa conservadora (crescimento {st.session_state['crescimento_mensal_pct']:.1f}% "
+            f"por mês, tectos realistas), o projeto **paga o imóvel em cerca de "
+            f"{pay/12:,.1f} anos** e, ao fim de {anos_sim:,.0f} anos, tem uma caixa "
+            f"acumulada de **EUR {caixa_final:,.0f}** para reinvestir ou distribuir."
+        )
+    elif pay is None:
         st.warning(
-            "Nos meses simulados a caixa acumulada nunca chega a positivo. "
-            "Ajusta preço, ocupação, crescimento, ou entra investimento externo."
+            "Nesta configuração o projeto não paga o imóvel dentro do horizonte simulado. "
+            "Ajusta preço-hora, ocupação ou crescimento na barra lateral."
         )
     else:
-        mes_be = breakeven_row.iloc[0]["Mês"]
-        st.success(f"Ponto de equilíbrio de caixa atingido em {mes_be}.")
+        st.info(
+            f"O imóvel paga-se em {pay/12:,.1f} anos, mas a caixa final é baixa. "
+            "Podes esticar a simulação ou aumentar a ocupação."
+        )
+
+    # Gráfico principal: caixa acumulada + linha do imóvel pago
+    chart_df = sim[["Mês", "Caixa acumulada (EUR)"]].copy()
+    chart_df["Ano"] = chart_df["Mês"] / 12.0
+
+    y_min = min(chart_df["Caixa acumulada (EUR)"].min(), 0.0)
+    y_max = max(chart_df["Caixa acumulada (EUR)"].max(), 0.0)
+
+    base = alt.Chart(chart_df).encode(
+        x=alt.X("Ano:Q", title="Anos desde o arranque"),
+    )
+
+    area = base.mark_area(
+        line={"color": "#7fb8b3", "strokeWidth": 3},
+        color=alt.Gradient(
+            gradient="linear",
+            stops=[alt.GradientStop(color="#cfe6e3", offset=0),
+                   alt.GradientStop(color="#7fb8b3", offset=1)],
+            x1=1, x2=1, y1=1, y2=0,
+        ),
+    ).encode(
+        y=alt.Y("Caixa acumulada (EUR):Q",
+                title="Caixa acumulada (EUR)",
+                scale=alt.Scale(domain=[y_min * 1.05, y_max * 1.05])),
+        tooltip=[alt.Tooltip("Ano:Q", format=".1f"),
+                 alt.Tooltip("Caixa acumulada (EUR):Q", format=",.0f")],
+    )
+
+    zero_line = alt.Chart(pd.DataFrame({"y": [0]})).mark_rule(
+        color="#b39ddb", strokeDash=[6, 4], size=2,
+    ).encode(y="y:Q")
+
+    payback_layer = None
+    if pay is not None:
+        pay_df = pd.DataFrame({"Ano": [pay / 12.0]})
+        payback_layer = alt.Chart(pay_df).mark_rule(
+            color="#f6a55c", strokeDash=[2, 2], size=2,
+        ).encode(x="Ano:Q")
+
+    layers = [area, zero_line]
+    if payback_layer is not None:
+        layers.append(payback_layer)
+    chart = alt.layer(*layers).properties(height=380).configure_axis(
+        labelColor="#2d2a26", titleColor="#2d2a26",
+    ).configure_view(strokeWidth=0)
+
+    st.altair_chart(chart, use_container_width=True)
+    st.caption(
+        "A linha violeta tracejada marca o momento em que os fundadores recuperam tudo o que "
+        "foi investido no arranque (caixa acumulada = 0). "
+        + (f"A linha laranja tracejada marca o ano {pay/12:.1f}, quando o imóvel está pago."
+           if pay is not None else "")
+    )
+
+    # Milestones
+    st.markdown("#### Marcos ao longo do tempo")
+    marcos_meses = [12, 60, 120, 240]
+    marcos = []
+    for m in marcos_meses:
+        if m <= len(sim):
+            row = sim.iloc[m - 1]
+            marcos.append({
+                "Fim do ano": m // 12,
+                "Receita bruta anual (EUR)": round(sim.iloc[max(0, m-12):m]["Receita total (EUR)"].sum(), 0),
+                "Margem anual (EUR)": round(sim.iloc[max(0, m-12):m]["Margem mensal (EUR)"].sum(), 0),
+                "Caixa acumulada no fim (EUR)": round(row["Caixa acumulada (EUR)"], 0),
+            })
+    if marcos:
+        st.dataframe(pd.DataFrame(marcos), use_container_width=True, hide_index=True)
+
+    # Detalhes técnicos (colapsado)
+    with st.expander("Ver simulação mês-a-mês (detalhe técnico)"):
+        st.dataframe(sim, use_container_width=True, hide_index=True)
 
 # --- Download ---
-with tabs[4]:
+with tabs[5]:
     st.subheader("Download da spreadsheet")
     st.caption(
         "Descarrega uma versão Excel com todas as tabelas e os parâmetros atuais. "
-        "Cada vez que carregas no botão, o ficheiro é gerado com os valores que estão a ver no ecrã."
+        "Inclui investimento inicial, custos mensais, receita mensal detalhada, "
+        "catálogo de artistas e simulação mês-a-mês completa."
     )
+    from datetime import date
     data = build_excel()
     fname = f"projeto_sala_de_som_{date.today().isoformat()}.xlsx"
     st.download_button(
@@ -500,6 +741,6 @@ with tabs[4]:
     )
 
     st.caption(
-        "Nota: os valores só existem enquanto a sessão do browser estiver aberta. "
+        "Os valores só existem enquanto a sessão do browser estiver aberta. "
         "Para guardares uma versão, faz download do Excel. Cada download é uma versão datada."
     )
