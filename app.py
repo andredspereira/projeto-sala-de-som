@@ -156,20 +156,73 @@ DEFAULTS = {
     "cap_faixas_mistura": 10.0,
 }
 
-ARTISTAS_INICIAIS = [
-    {"Artista": "Inês Rebelo (Salacia)", "Estilo": "", "Notas": ""},
-    {"Artista": "Giblets and Gravy", "Estilo": "", "Notas": ""},
-    {"Artista": "Samuel Dias", "Estilo": "", "Notas": ""},
-    {"Artista": "Razy", "Estilo": "", "Notas": ""},
-    {"Artista": "Diogo Verdelindo", "Estilo": "", "Notas": ""},
-    {"Artista": "SubRosa", "Estilo": "", "Notas": ""},
+CATALOGO_COLUMNS = [
+    "Artista/Banda",
+    "Interesse",
+    "Regularidade",
+    "Acordo Mensal ou Aluguer Pontual?",
+    "Necessitam Piano",
 ]
+
+_ARTISTAS_ROWS = [
+    ("Jiblets & Gravy", "3", "-", "-", "Não"),
+    ("Inês Rebelo (Salacae)", "3", "-", "-", "Sim"),
+    ("Samuel Dias", "3", "-", "Acordo Mensal", "Sim"),
+    ("Francisco Nogueira", "3", "-", "-", "Sim"),
+    ("Diogo Verdelindo", "3", "-", "-", "Não"),
+    ("Razy", "3", "2", "-", "Sim"),
+    ("Adoro Protocolo / Sami", "2", "-", "-", "Não"),
+    ("Muzo", "2", "1", "Aluguer Pontual", "Sim"),
+    ("Cobaia", "1", "1", "Aluguer Pontual", "Não"),
+    ("João Spencer", "3", "1", "Aluguer Pontual", "Não"),
+    ("Alice Sampayo", "1", "1", "Aluguer Pontual", "Sim"),
+    ("Victor Bigliardi", "2", "1", "Aluguer Pontual", "-"),
+    ("Alexandre Girard", "3", "3", "Incerto", "-"),
+    ("SubRosa", "3", "2", "-", "-"),
+    ("Half Blind", "3", "1", "Aluguer Pontual", "Não"),
+    ("Gisela Mabel", "1", "1", "Aluguer Pontual", "Sim"),
+    ("Hugo Henriques", "3", "1", "Incerto", "Talvez"),
+    ("Gonçalo (Candy Flip)", "3", "2", "Incerto", "Não"),
+    ("Nery", "1", "1", "Aluguer Pontual", "Sim"),
+    ("João Cintra", "1", "1", "Aluguer Pontual", "Não"),
+    ("Margarida Noivo", "2", "1", "Aluguer Pontual", "Sim"),
+    ("Luís Severo", "3", "1", "Aluguer Pontual", "Sim"),
+    ("Israel Bianchi", "2", "1", "Aluguer Pontual", "Não"),
+    ("Afonso Henrique", "2", "1", "Aluguer Pontual", "Não"),
+    ("Mateus Oliveira", "1", "1", "Aluguer Pontual", "-"),
+    ("Vasco Ribeiro", "2", "1", "Aluguer Pontual", "Não"),
+    ("Inês Pimenta", "2", "1", "Aluguer Pontual", "Sim"),
+    ("José Lencastre", "3", "1", "Aluguer Pontual", "-"),
+    ("Tiago Paiva", "3", "2", "Aluguer Pontual", "Não"),
+    ("Paulo Edson", "1", "1", "Aluguer Pontual", "Não"),
+    ("Emmanuel Gratuze", "2", "1", "Aluguer Pontual", "Sim"),
+    ("Rodrigo Coelho, Rod e Filipe", "2", "1", "Aluguer Pontual", "Não"),
+    ("Alexandre Taborda", "2", "1", "Aluguer Pontual", "Não"),
+    ("Ravenna Escaleira", "1", "1", "Aluguer Pontual", "Sim"),
+    ("Luís e Sebastião Macedo", "2", "1", "Aluguer Pontual", "Sim"),
+    ("Élvio Rodrigues (Slow Burner)", "2", "1", "Aluguer Pontual", "Sim"),
+    ("Bruno Humberto (Humberto)", "2", "1", "Aluguer Pontual", "Não"),
+    ("Bruno Dionísio", "1", "1", "Aluguer Pontual", "Não"),
+    ("Rogério Pitomba", "1", "1", "Aluguer Pontual", "Não"),
+    ("Ricardo Rogagels", "3", "1", "Aluguer Pontual", "-"),
+    ("Francisco Antunes", "1", "1", "Aluguer Pontual", "Sim"),
+    ("Paulo Chagas e Karoline Leblanc (sessões de improvisação Jazz)", "2", "1", "Aluguer Pontual", "Sim"),
+    ("Parceria Hot Clube - Francisco Rego ? (desconto 1 ou 2€/h)", "-", "-", "Aluguer Pontual", "Sim"),
+]
+ARTISTAS_INICIAIS = [dict(zip(CATALOGO_COLUMNS, r)) for r in _ARTISTAS_ROWS]
+
+
+def _catalogo_default_df() -> pd.DataFrame:
+    return pd.DataFrame(ARTISTAS_INICIAIS, columns=CATALOGO_COLUMNS)
 
 
 def _init_state():
     for k, v in DEFAULTS.items():
         st.session_state.setdefault(k, v)
-    st.session_state.setdefault("catalogo_artistas", pd.DataFrame(ARTISTAS_INICIAIS))
+    # Se o catalogo nao existir OU tiver esquema antigo, restaura ao default
+    cat = st.session_state.get("catalogo_artistas")
+    if cat is None or list(cat.columns) != CATALOGO_COLUMNS:
+        st.session_state["catalogo_artistas"] = _catalogo_default_df()
 
 
 _init_state()
@@ -178,7 +231,7 @@ _init_state()
 def _reset_defaults():
     for k, v in DEFAULTS.items():
         st.session_state[k] = v
-    st.session_state["catalogo_artistas"] = pd.DataFrame(ARTISTAS_INICIAIS)
+    st.session_state["catalogo_artistas"] = _catalogo_default_df()
 
 
 # ---------------------------------------------------------------------------
@@ -620,22 +673,67 @@ with tabs[2]:
 with tabs[3]:
     st.subheader("Catálogo de Artistas")
     st.caption(
-        "Lista de artistas que esperamos que usem o espaço. Podes editar, "
-        "adicionar linhas (última linha em branco) e apagar directamente na tabela."
+        "Lista de artistas e bandas que esperamos que usem o espaço. "
+        "Interesse e Regularidade em escala 1 (baixo) a 3 (alto). "
+        "Podes editar, adicionar linhas (última linha em branco) e apagar directamente na tabela."
     )
+    _opts_1_3 = ["1", "2", "3", "-"]
+    _opts_modalidade = ["Acordo Mensal", "Aluguer Pontual", "Incerto", "-"]
+    _opts_piano = ["Sim", "Não", "Talvez", "-"]
+
     edited = st.data_editor(
         st.session_state["catalogo_artistas"],
         num_rows="dynamic",
         use_container_width=True,
+        height=520,
         column_config={
-            "Artista": st.column_config.TextColumn("Artista", required=True),
-            "Estilo": st.column_config.TextColumn("Estilo"),
-            "Notas": st.column_config.TextColumn("Notas"),
+            "Artista/Banda": st.column_config.TextColumn("Artista/Banda", required=True),
+            "Interesse": st.column_config.SelectboxColumn(
+                "Interesse", options=_opts_1_3, help="1 = baixo, 3 = alto"),
+            "Regularidade": st.column_config.SelectboxColumn(
+                "Regularidade", options=_opts_1_3, help="1 = pontual, 3 = muito regular"),
+            "Acordo Mensal ou Aluguer Pontual?": st.column_config.SelectboxColumn(
+                "Acordo Mensal ou Aluguer Pontual?", options=_opts_modalidade),
+            "Necessitam Piano": st.column_config.SelectboxColumn(
+                "Necessitam Piano", options=_opts_piano),
         },
         key="catalogo_editor",
     )
     st.session_state["catalogo_artistas"] = edited
-    st.metric("Total de artistas no catálogo", len(edited))
+
+    st.metric("Total de artistas/bandas no catálogo", len(edited))
+
+    # Resumo de contagens
+    st.markdown("---")
+    st.markdown("#### Distribuição por categoria")
+    st.caption("Número de artistas em cada opção, por coluna.")
+
+    def _resumo_col(df: pd.DataFrame, col: str, order: list, short_label: str) -> pd.DataFrame:
+        vals = df[col].fillna("-").astype(str).replace("", "-")
+        counts = vals.value_counts().to_dict()
+        rows = [(v, int(counts.get(v, 0))) for v in order]
+        # Categorias fora da ordem esperada (edições futuras)
+        for v, n in counts.items():
+            if v not in order:
+                rows.append((v, int(n)))
+        return pd.DataFrame(rows, columns=[short_label, "N"])
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("**Interesse** (1 baixo → 3 alto)")
+        st.dataframe(_resumo_col(edited, "Interesse", _opts_1_3, "Interesse"),
+                     use_container_width=True, hide_index=True)
+        st.markdown("**Modalidade** (Acordo Mensal / Aluguer Pontual)")
+        st.dataframe(_resumo_col(edited, "Acordo Mensal ou Aluguer Pontual?",
+                                 _opts_modalidade, "Modalidade"),
+                     use_container_width=True, hide_index=True)
+    with c2:
+        st.markdown("**Regularidade** (1 pontual → 3 muito regular)")
+        st.dataframe(_resumo_col(edited, "Regularidade", _opts_1_3, "Regularidade"),
+                     use_container_width=True, hide_index=True)
+        st.markdown("**Necessitam Piano**")
+        st.dataframe(_resumo_col(edited, "Necessitam Piano", _opts_piano, "Piano"),
+                     use_container_width=True, hide_index=True)
 
 # --- Sustentabilidade ---
 with tabs[4]:
